@@ -1,0 +1,16 @@
+#
+# Make all ZKSplunk knowledge objects readable app-wide and globally shared,
+# so the dashboard, saved searches, and nav are visible to all roles.
+#
+[]
+access = read : [ * ], write : [ admin, power ]
+export = system
+
+[views]
+export = system
+
+[savedsearches]
+export = system
+
+[props]
+export = system

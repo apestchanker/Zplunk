@@ -1,0 +1,282 @@
+<form version="1.1" theme="dark">
+  <label>ZKSplunk Component Detail</label>
+  <description>Drilldown detail for one monitored component. Public metadata only; no private Midnight state is read.</description>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="dropdown" token="component" searchWhenChanged="true">
+      <label>Component</label>
+      <default>indexer</default>
+      <choice value="proof-server">proof-server</choice>
+      <choice value="indexer">indexer</choice>
+      <choice value="node">node</choice>
+      <choice value="wallet">wallet</choice>
+      <choice value="contracts">contracts</choice>
+      <choice value="connector">connector</choice>
+      <change>
+        <condition value="wallet">
+          <set token="show_wallet">true</set>
+          <unset token="show_connector"></unset>
+          <unset token="show_chain"></unset>
+        </condition>
+        <condition value="connector">
+          <unset token="show_wallet"></unset>
+          <set token="show_connector">true</set>
+          <unset token="show_chain"></unset>
+        </condition>
+        <condition value="indexer">
+          <unset token="show_wallet"></unset>
+          <unset token="show_connector"></unset>
+          <set token="show_chain">true</set>
+        </condition>
+        <condition value="node">
+          <unset token="show_wallet"></unset>
+          <unset token="show_connector"></unset>
+          <set token="show_chain">true</set>
+        </condition>
+        <condition>
+          <unset token="show_wallet"></unset>
+          <unset token="show_connector"></unset>
+          <unset token="show_chain"></unset>
+        </condition>
+      </change>
+    </input>
+    <input type="time" token="field_time" searchWhenChanged="true">
+      <label>Time range</label>
+      <default>
+        <earliest>-60m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:8px 12px; color:#d3dae3;">
+          <b>Component:</b> $component$
+          &#160;&#8212;&#160;
+          <a href="/app/zksplunk/zksplunk_overview">Back to overview</a>
+          &#160;&#8212;&#160;
+          <a href="http://localhost:8787" target="_blank">Open the MCP/chat analyst &#8594;</a>
+          <br/>
+          <span style="color:#9aa6b2;">Privacy boundary: ZKSplunk monitors public infrastructure metadata and public unshielded activity only. Shielded balances, witnesses, parties, and amounts remain private.</span>
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Current status</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") component="$component$" earliest=$field_time.earliest$ latest=$field_time.latest$
+| sort 0 -_time
+| head 1
+| eval current_status=coalesce(status,severity,"unknown")
+| fields current_status</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53A051","0x1182F3","0xF8BE34","0xDC4E41"]</option>
+        <option name="rangeValues">[0,1,2]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Latest response time</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="midnight:contracts") component="$component$" response_time_ms=* earliest=$field_time.earliest$ latest=$field_time.latest$
+| stats latest(response_time_ms) as response_time_ms</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="unit">ms</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Events in range</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts" OR sourcetype="midnight:chain") component="$component$" earliest=$field_time.earliest$ latest=$field_time.latest$
+| stats count as events</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Critical events</title>
+      <single>
+        <search>
+          <query>index=zksplunk component="$component$" earliest=$field_time.earliest$ latest=$field_time.latest$
+| where status="critical" OR severity="critical" OR send_status="failed"
+| stats count as critical_events</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53A051","0xDC4E41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Status over time</title>
+      <chart>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") component="$component$" earliest=$field_time.earliest$ latest=$field_time.latest$
+| eval status=coalesce(status,severity,"unknown")
+| timechart span=1m count by status</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Response time trend</title>
+      <chart>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="midnight:contracts") component="$component$" response_time_ms=* earliest=$field_time.earliest$ latest=$field_time.latest$
+| timechart span=1m avg(response_time_ms) as avg_ms perc95(response_time_ms) as p95_ms</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleY.text">ms</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Latest component facts</title>
+      <table>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") component="$component$" earliest=$field_time.earliest$ latest=$field_time.latest$
+| sort 0 -_time
+| head 1
+| eval t=strftime(_time,"%Y-%m-%d %H:%M:%S")
+| table t type status severity response_time_ms probe_name endpoint http_status graphql_errors_count message error_name error_message</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"healthy":0x53A051,"warning":0xF8BE34,"critical":0xDC4E41,"unknown":0x708794,"tracked":0x1182F3}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+
+  <row depends="$show_wallet$">
+    <panel>
+      <title>Wallet public unshielded view</title>
+      <table>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" component="wallet" type="midnight.wallet.boundary" earliest=$field_time.earliest$ latest=$field_time.latest$
+| sort 0 -_time
+| head 10
+| eval t=strftime(_time,"%H:%M:%S")
+| table t status wallet_network wallet_address unshielded_tx_count unshielded_created_utxos unshielded_spent_utxos unshielded_token_types unshielded_primary_balance indexer_highest_tx_id wallet_balance_shielded_private message</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">10</option>
+      </table>
+    </panel>
+  </row>
+
+  <row depends="$show_connector$">
+    <panel>
+      <title>Connector delivery health</title>
+      <table>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:connector" earliest=$field_time.earliest$ latest=$field_time.latest$
+| sort 0 -_time
+| head 20
+| eval t=strftime(_time,"%H:%M:%S")
+| table t type status severity send_status total_events_sent total_events_failed failed_events_since_last_heartbeat queued_events average_latency_ms batch_event_count send_attempt hec_response_code message error_message</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">20</option>
+      </table>
+    </panel>
+  </row>
+
+  <row depends="$show_chain$">
+    <panel>
+      <title>Chain block cadence</title>
+      <chart>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:chain" type="midnight.chain.block_latest" earliest=$field_time.earliest$ latest=$field_time.latest$
+| timechart span=1m latest(block_height) as block_height latest(block_age_seconds) as block_age_seconds</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Raw events</title>
+      <table>
+        <search>
+          <query>index=zksplunk component="$component$" earliest=$field_time.earliest$ latest=$field_time.latest$
+| sort 0 -_time
+| eval t=strftime(_time,"%Y-%m-%d %H:%M:%S")
+| table t sourcetype type component status severity response_time_ms message error_message
+| head 100</query>
+          <earliest>$field_time.earliest$</earliest>
+          <latest>$field_time.latest$</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">cell</option>
+        <option name="count">25</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"healthy":0x53A051,"warning":0xF8BE34,"critical":0xDC4E41,"unknown":0x708794,"tracked":0x1182F3}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+</form>

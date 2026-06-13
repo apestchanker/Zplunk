@@ -1,0 +1,238 @@
+// =============================================================================
+// MidnightVitals — Core Type Definitions
+// =============================================================================
+// All TypeScript interfaces and types used across the vitals module.
+// Designed to be provider-agnostic: mock and live providers both use these.
+// =============================================================================
+
+
+// ---------------------------------------------------------------------------
+// Vital Monitor Types
+// ---------------------------------------------------------------------------
+
+/**
+ * The health status of a single monitored component.
+ *   healthy  — Component is running and responsive
+ *   warning  — Component is running but slow or degraded
+ *   critical — Component is down or unreachable
+ *   unknown  — Haven't checked yet or check is in progress
+ *   tracked  — Public activity is being observed, but private health is not read
+ */
+export type VitalStatus = 'healthy' | 'warning' | 'critical' | 'unknown' | 'tracked';
+
+/**
+ * Identifies which component a vital monitor tracks.
+ *
+ * `network` is retained for backwards compatibility (older events used a single
+ * combined indexer/node vital). Per ZKSPLUNK_MONITORING_AND_MCP_SPEC.md the
+ * combined `network` vital is split into explicit `indexer` and `node`.
+ */
+export type VitalId =
+  | 'proof-server'
+  | 'network'
+  | 'indexer'
+  | 'node'
+  | 'wallet'
+  | 'contracts';
+
+/**
+ * A single vital monitor's current state.
+ * Think of this as one reading on a hospital vitals screen.
+ */
+export interface VitalMonitor {
+  id: VitalId;
+  label: string;                       // Human-readable name (e.g., "Proof Server")
+  status: VitalStatus;
+  lastCheckTimestamp: number | null;    // Unix ms of last check, null if never checked
+  lastResponseTimeMs: number | null;   // Latency in ms, null if not applicable
+  message: string;                     // Plain-English status description
+  detailLine: string;                  // Short detail for the card (e.g., "Response: 52ms")
+  checkIntervalSeconds: number;        // How often this vital auto-checks
+}
+
+/**
+ * Result returned by a provider's health check function.
+ *
+ * The first four fields are the original, always-present contract. Everything
+ * below is optional structured enrichment defined by
+ * ZKSPLUNK_MONITORING_AND_MCP_SPEC.md so probes can carry HTTP/GraphQL/chain
+ * detail straight through to the Splunk HEC envelope. Providers that don't
+ * populate a field simply leave it undefined.
+ */
+export interface VitalCheckResult {
+  status: VitalStatus;
+  message: string;
+  detailLine: string;
+  responseTimeMs: number | null;
+
+  /** Logical or URL endpoint that was probed (never contains secrets). */
+  endpoint?: string;
+  /** Exact probe name, e.g. `proof_server_health`, `indexer_latest_block`. */
+  probeName?: string;
+  /** HTTP status code when the probe was an HTTP call. */
+  httpStatus?: number | null;
+  /** Error class/name when the probe failed. */
+  errorName?: string | null;
+  /** Sanitized error message when the probe failed. */
+  errorMessage?: string | null;
+  /** Number of GraphQL errors returned (indexer probes). */
+  graphqlErrorsCount?: number | null;
+  /** Latest block height (chain probes). */
+  blockHeight?: number | null;
+  /** Latest block hash (chain probes). */
+  blockHash?: string | null;
+  /** Latest block unix timestamp in seconds (chain probes). */
+  blockTimestamp?: number | null;
+  /** Age of the latest block in seconds (chain probes). */
+  blockAgeSeconds?: number | null;
+  /** True when the configured endpoint does not support this probe. */
+  unsupportedProbe?: boolean;
+  /** Free-form extra fields merged into the HEC `event` object. */
+  extra?: Record<string, string | number | boolean | null>;
+}
+
+
+// ---------------------------------------------------------------------------
+// Console Log Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Severity level of a console log entry. Each level gets distinct styling.
+ *   action  — Blue: User performed an action (clicked, navigated, submitted)
+ *   info    — Gray: Informational context about what's happening
+ *   success — Green: Something completed successfully
+ *   warning — Amber: Something to watch out for, but not broken
+ *   error   — Red: Something failed, with explanation and suggested fix
+ */
+export type LogLevel = 'action' | 'info' | 'success' | 'warning' | 'error';
+
+/**
+ * A single entry in the vitals console log.
+ * Every entry is written in plain English — no jargon without explanation.
+ */
+export interface VitalsLogEntry {
+  id: string;                         // Unique identifier (uuid or incremental)
+  timestamp: number;                  // Unix ms when this entry was created
+  level: LogLevel;
+  message: string;                    // Primary plain-English message
+  detail?: string;                    // Optional: deeper explanation paragraph
+  suggestion?: string;                // Optional: "What to do" guidance (errors only)
+}
+
+
+// ---------------------------------------------------------------------------
+// Contract Info
+// ---------------------------------------------------------------------------
+
+/**
+ * Information about a deployed smart contract to monitor.
+ */
+export interface ContractInfo {
+  id: string;                         // Internal identifier (e.g., "discovery-core")
+  name: string;                       // Human-readable name (e.g., "Case Management")
+  address: string;                    // On-chain contract address (hex string or empty)
+}
+
+
+// ---------------------------------------------------------------------------
+// Dependency Check Types
+// ---------------------------------------------------------------------------
+
+/**
+ * Result of checking a system dependency (Docker, Node, Compact compiler, etc.)
+ */
+export interface DependencyCheckResult {
+  name: string;                       // e.g., "Docker", "Node.js", "Compact Compiler"
+  installed: boolean;
+  version: string | null;             // e.g., "27.5.1" or null if not installed
+  message: string;                    // Plain-English status
+}
+
+
+// ---------------------------------------------------------------------------
+// Diagnostic Report
+// ---------------------------------------------------------------------------
+
+/**
+ * The full diagnostic report generated by "Run Diagnostics."
+ * Aggregates all vital checks + dependency checks into a single report.
+ */
+export interface DiagnosticReport {
+  timestamp: number;
+  vitals: VitalMonitor[];
+  dependencies: DependencyCheckResult[];
+  totalChecks: number;
+  healthyCount: number;
+  summary: string;                    // e.g., "10 out of 12 vitals are healthy."
+}
+
+
+// ---------------------------------------------------------------------------
+// Vitals Provider Interface
+// ---------------------------------------------------------------------------
+
+/**
+ * The contract that both mock and live providers must implement.
+ * This abstraction lets us swap between simulated and real data
+ * without changing any UI code.
+ */
+export interface VitalsProviderInterface {
+  checkProofServer(): Promise<VitalCheckResult>;
+  checkNetwork(): Promise<VitalCheckResult>;
+  checkWallet(): Promise<VitalCheckResult>;
+  checkContracts(contracts: ContractInfo[]): Promise<VitalCheckResult>;
+  checkDependencies(): Promise<DependencyCheckResult[]>;
+}
+
+
+// ---------------------------------------------------------------------------
+// Vitals Context State
+// ---------------------------------------------------------------------------
+
+/**
+ * The complete global state managed by VitalsContext.
+ * This is the single source of truth for the entire vitals module.
+ */
+/**
+ * Where the diagnostic cards sit relative to the CLI console.
+ * - top: horizontal strip above the console (default)
+ * - left: vertical column on the left, console on the right
+ * - right: vertical column on the right, console on the left
+ */
+export type CardPosition = 'top' | 'left' | 'right';
+
+/**
+ * Panel docking mode.
+ * - docked: fixed to the bottom of the viewport (default, classic behavior)
+ * - floating: free-positioned window the user can drag anywhere on screen
+ */
+export type PanelMode = 'docked' | 'floating';
+
+export interface VitalsState {
+  isOpen: boolean;                    // Whether the panel is visible
+  panelHeight: number;                // Panel height in pixels
+  panelWidth: number;                 // Panel width in pixels (used in floating mode)
+  cardPosition: CardPosition;         // Where diagnostic cards sit relative to CLI
+  panelMode: PanelMode;               // Docked at bottom vs free-floating window
+  panelPosition: { x: number; y: number }; // Floating-mode position (top-left corner)
+  monitors: VitalMonitor[];           // Current state of all 4 monitors
+  logEntries: VitalsLogEntry[];       // Console log history
+  logFilter: LogLevel | 'all';        // Active filter on console
+  isRunningDiagnostic: boolean;       // True while full diagnostic is in progress
+}
+
+/**
+ * Actions that can be dispatched to update vitals state.
+ */
+export type VitalsAction =
+  | { type: 'TOGGLE_PANEL' }
+  | { type: 'SET_PANEL_HEIGHT'; height: number }
+  | { type: 'UPDATE_MONITOR'; id: VitalId; update: Partial<VitalMonitor> }
+  | { type: 'ADD_LOG_ENTRY'; entry: VitalsLogEntry }
+  | { type: 'CLEAR_LOG' }
+  | { type: 'SET_LOG_FILTER'; filter: LogLevel | 'all' }
+  | { type: 'SET_RUNNING_DIAGNOSTIC'; running: boolean }
+  | { type: 'SET_CARD_POSITION'; position: CardPosition }
+  | { type: 'SET_PANEL_MODE'; mode: PanelMode }
+  | { type: 'SET_PANEL_POSITION'; x: number; y: number }
+  | { type: 'SET_PANEL_WIDTH'; width: number };

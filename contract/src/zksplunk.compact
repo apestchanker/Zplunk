@@ -1,0 +1,288 @@
+pragma language_version >= 0.23;
+
+// ============================================================================
+// ZKSplunk — Anonymous Critical-Incident Attestation Contract
+// ----------------------------------------------------------------------------
+// Purpose:
+//   Anchor ONLY critical infrastructure incidents on-chain as ANONYMOUS,
+//   UNLINKABLE attestations, so the whole Midnight network gains situational
+//   awareness ("N operators reporting incident-class X this epoch = coordinated
+//   campaign") WITHOUT any operator revealing who or where they are.
+//
+//   Model (anonymous, unlinkable critical-incident attestation):
+//     1. Membership WITHOUT identity. Operators are registered as commitments
+//        in a HistoricMerkleTree. A leaf = persistentHash(domain, secretKey).
+//        To attest, an operator proves Merkle set-membership in zero knowledge
+//        (path supplied via a witness) WITHOUT revealing which leaf. There is
+//        NO public per-operator identity map. A sealed admin key, set at
+//        deployment, manages the membership set by inserting commitments.
+//     2. Anonymous critical attestation. `attestCriticalIncident` proves the
+//        caller's operator commitment is a member of the tree, derives and
+//        publishes a one-time nullifier scoped to an `epoch`/`incidentId`
+//        (persistentHash(domain, secretKey, scope)) to make reports unlinkable
+//        and prevent replay/duplicates, asserts the nullifier is unspent, then
+//        records it. It appends to a PUBLIC append-only incident log ONLY the
+//        anonymized incidentClass, severity, payloadCommitment, epoch, and a
+//        sequence index. It discloses ONLY those values + the nullifier — NEVER
+//        the operator identity, the secret, or which leaf.
+//     3. Public aggregation surface. A Counter for total attestations and a
+//        public append-only log (Map<Field, IncidentRecord>) so an off-chain
+//        "Macro" view can aggregate "N operators reporting class X this epoch".
+//
+//   Privacy invariant: an on-chain observer learns THAT a registered-but-
+//   unidentified operator saw a class-X critical incident in epoch E — never
+//   WHO, never WHERE, and never linkable to that operator's other reports.
+//
+//   NOTE ON BLOCK HEIGHT. Compact exposes block time ONLY as comparison
+//   predicates (blockTimeGte / blockTimeLt / ...); there is no primitive that
+//   returns the current block height/time as a value to store in the ledger.
+//   The block a transaction lands in is already public chain metadata that the
+//   indexer records, so it is NOT stored on-chain here. Instead each record
+//   carries a caller-supplied `epoch` (the time bucket the Macro view buckets
+//   on, e.g. unix-hour), which is also what scopes the unlinkability nullifier.
+//
+// Author: ZKSplunk / EnterpriseZK Labs LLC
+// ============================================================================
+
+import CompactStandardLibrary;
+
+// ---------------------------------------------------------------------------
+// Domain separators (kept centralized to avoid accidental correlation).
+//   - PK / commit domain derives the operator's membership-tree leaf.
+//   - NUL domain derives the per-incident unlinkability nullifier.
+// These MUST stay distinct so an observer cannot match leaves to nullifiers.
+// ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Enums — exported so TypeScript can use them
+// ---------------------------------------------------------------------------
+
+// Severity of the attested critical incident.
+export enum Severity {
+  info,
+  warning,
+  degraded,
+  critical,
+  outage
+}
+
+// Anonymized incident category — the network-wide awareness signal. This is
+// the ONLY semantic content published; it carries no operator/node identity.
+export enum IncidentClass {
+  proofServerOutage,
+  authBruteforceBurst,
+  mintAnomaly,
+  blockStall,
+  walletDrain
+}
+
+// ---------------------------------------------------------------------------
+// Public append-only incident record (the Macro aggregation surface).
+// Contains ONLY anonymized fields. No operator identity, node, or payload.
+// ---------------------------------------------------------------------------
+export struct IncidentRecord {
+  incidentClass: IncidentClass,
+  severity: Severity,
+  epoch: Uint<64>, // caller-supplied time bucket (e.g. unix-hour)
+  payloadCommitment: Bytes<32>, // commitment to off-chain Splunk detail
+  nullifier: Bytes<32> // one-time, unlinkable, anti-replay tag
+}
+
+// ---------------------------------------------------------------------------
+// Sealed configuration — set once at deployment, immutable forever
+// ---------------------------------------------------------------------------
+
+// Which Midnight network (mainnet / preprod / preview) this contract binds to.
+// Prevents cross-network replay of registrations / attestations.
+export sealed ledger networkId: Bytes<32>;
+
+// The admin's derived public-key hash. The admin manages the membership set.
+// Set once; cannot be rotated without redeploying the contract.
+export sealed ledger adminPublicKeyHash: Bytes<32>;
+
+// Schema version for the off-chain payload structure. Off-chain services
+// refuse attestations for unknown schema versions.
+export sealed ledger observabilitySchemaVersion: Field;
+
+// ---------------------------------------------------------------------------
+// Mutable ledger state
+// ---------------------------------------------------------------------------
+
+// Registered operators, as a privacy-preserving commitment tree. A leaf is
+// persistentHash("zksplunk:op:commit:", secretKey). HistoricMerkleTree is used
+// (not MerkleTree) so membership proofs minted before later registrations stay
+// valid against historic roots. Depth 16 supports up to 65,536 operators.
+export ledger operators: HistoricMerkleTree<16, Bytes<32>>;
+
+// Spent unlinkability nullifiers — public by design, reveals nothing about
+// who. Blocks replay/duplicate critical reports for the same (operator, scope).
+export ledger spentNullifiers: Set<Bytes<32>>;
+
+// Total anonymous critical attestations recorded (also the next log index).
+export ledger attestationCount: Counter;
+
+// Public append-only incident log: sequenceIndex (as Field) -> IncidentRecord.
+// This is what the off-chain Macro view scans/aggregates.
+export ledger incidentLog: Map<Field, IncidentRecord>;
+
+// ---------------------------------------------------------------------------
+// Witnesses — off-chain data providers (implemented in witnesses.ts)
+// ---------------------------------------------------------------------------
+
+// The caller's operator secret key. Never leaves the prover's machine; only
+// the derived leaf commitment and a scoped nullifier are produced from it.
+witness localSecretKey(): Bytes<32>;
+
+// The Merkle authentication path proving the operator's leaf commitment is a
+// member of the `operators` tree. Supplied by the prover from its local copy
+// of the tree state; verified in zero knowledge inside the circuit.
+witness operatorPath(leaf: Bytes<32>): MerkleTreePath<16, Bytes<32>>;
+
+// ---------------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------------
+
+constructor(_networkId: Bytes<32>, _adminKeyHash: Bytes<32>, _schemaVersion: Field) {
+  networkId = disclose(_networkId);
+  adminPublicKeyHash = disclose(_adminKeyHash);
+  observabilitySchemaVersion = disclose(_schemaVersion);
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers (non-exported circuits)
+// ---------------------------------------------------------------------------
+
+// Derive the caller's public-key hash from their secret key (the standard
+// Compact authentication pattern — no builtin public_key() exists). Used only
+// for ADMIN authentication, never for operator identity (operators are
+// anonymous via Merkle membership).
+circuit callerKeyHash(): Bytes<32> {
+  const sk = localSecretKey();
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "zksplunk:admin:pk:"), sk]);
+}
+
+// Derive the caller's operator membership-tree leaf commitment.
+// Distinct domain from the admin PK and from the nullifier so the leaf cannot
+// be correlated with either.
+circuit operatorLeaf(sk: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<2, Bytes<32>>>([pad(32, "zksplunk:op:commit:"), sk]);
+}
+
+// Derive the per-incident unlinkability nullifier. Scoped by `scope` (an
+// incidentId or epoch encoded as Bytes<32>) so an operator can file one report
+// per scope while distinct scopes stay unlinkable. Distinct domain from leaf.
+circuit incidentNullifier(sk: Bytes<32>, scope: Bytes<32>): Bytes<32> {
+  return persistentHash<Vector<3, Bytes<32>>>([pad(32, "zksplunk:crit-nul:"), sk, scope]);
+}
+
+// Fail unless the caller is the admin configured at deployment.
+circuit assertAdmin(): [] {
+  const caller = callerKeyHash();
+  assert(disclose(caller == adminPublicKeyHash), "Not admin");
+}
+
+// ---------------------------------------------------------------------------
+// Admin circuits — membership-set management
+// ---------------------------------------------------------------------------
+
+// Admin registers a new operator by inserting their commitment leaf into the
+// membership tree. The leaf is hidden by leaf_hash() on insertion; the operator
+// derives the SAME leaf locally from their secret key via operatorLeaf().
+//
+//   operatorCommitment: persistentHash("zksplunk:op:commit:", operatorSecretKey)
+//                       computed off-chain by the operator and handed to the
+//                       admin out-of-band during onboarding.
+export circuit registerOperator(operatorCommitment: Bytes<32>): [] {
+  assertAdmin();
+  operators.insert(disclose(operatorCommitment));
+}
+
+// ---------------------------------------------------------------------------
+// Operator circuit — anonymous critical-incident attestation
+// ---------------------------------------------------------------------------
+
+// A registered operator anonymously attests a CRITICAL incident.
+//
+//   incidentClass:     anonymized category (the network-wide awareness signal)
+//   severity:          Severity enum value
+//   epoch:             caller-supplied time bucket (e.g. unix-hour) the Macro
+//                      view aggregates on; also scopes the nullifier so one
+//                      report per (operator, epoch, scopeTag) is allowed
+//   scopeTag:          extra Bytes<32> distinguishing distinct incidents within
+//                      the same epoch (e.g. hash of the incidentId). Use a zero
+//                      Bytes<32> for a plain one-per-epoch report.
+//   payloadCommitment: commitment to the off-chain Splunk detail (node,
+//                      endpoint, addresses, latencies, payload) — stays public
+//                      as an opaque 32-byte commitment only.
+//
+// Flow:
+//   1. Derive the operator leaf from the secret key (never disclosed).
+//   2. Get the Merkle path from the witness; recompute + check the root in ZK.
+//   3. Derive a scoped nullifier; assert unspent; record it.
+//   4. Append an anonymized record to the public incident log.
+//
+// Discloses ONLY: incidentClass, severity, epoch, scopeTag (via nullifier
+// derivation input), payloadCommitment, nullifier, the membership-root digest.
+// NEVER discloses the secret, the leaf, or which tree position was used.
+export circuit attestCriticalIncident(
+                 incidentClass: IncidentClass,
+                 severity: Severity,
+                 epoch: Uint<64>,
+                 scopeTag: Bytes<32>,
+                 payloadCommitment: Bytes<32>
+                 ): [] {
+  // --- Step 1: derive the operator's membership leaf (stays private) ---
+  const sk = localSecretKey();
+  const leaf = operatorLeaf(sk);
+
+  // --- Step 2: prove membership via Merkle path, anonymously ---
+  const path = operatorPath(leaf);
+  // Bind the path to THIS caller's commitment: a valid path only proves that
+  // *some* leaf is in the tree. Without this check a prover could submit a path
+  // for a leaf they do not control. Disclosing the equality reveals only a
+  // boolean (the supplied path matches the caller's own commitment), never
+  // which leaf or position.
+  assert(disclose(path.leaf == leaf), "Merkle path does not match caller commitment");
+  const root = merkleTreePathRoot<16, Bytes<32>>(path);
+  // checkRoot's digest argument is public; disclose() it. The proof verifies
+  // the path WITHOUT revealing which leaf/position was used.
+  assert(operators.checkRoot(disclose(root)), "Not a registered operator");
+
+  // --- Step 3: scoped nullifier — unlinkability + anti-replay ---
+  // Scope binds epoch + scopeTag so the same operator can report across epochs
+  // (and across distinct incidents in an epoch) but cannot duplicate within a
+  // single (epoch, scopeTag).
+  const scope = persistentHash<Vector<2, Bytes<32>>>([(epoch as Field) as Bytes<32>, scopeTag]);
+  const nul = incidentNullifier(sk, scope);
+  assert(disclose(!spentNullifiers.member(disclose(nul))),
+         "Duplicate critical attestation for this scope"
+         );
+  spentNullifiers.insert(disclose(nul));
+
+  // --- Step 4: append anonymized record to the public log ---
+  const idx = attestationCount.read() as Field;
+  incidentLog.insert(
+    idx,
+    IncidentRecord { incidentClass: disclose(incidentClass),
+                     severity: disclose(severity),
+                     epoch: disclose(epoch),
+                     payloadCommitment: disclose(payloadCommitment),
+                     nullifier: disclose(nul) }
+    );
+  attestationCount.increment(1);
+}
+
+// ---------------------------------------------------------------------------
+// Read-only circuits (no state mutation, exported for TS use)
+// ---------------------------------------------------------------------------
+
+// Total number of anonymous critical attestations recorded.
+export circuit getAttestationCount(): Uint<64> {
+  return attestationCount.read();
+}
+
+// True if the given nullifier has already been spent (used by off-chain tools
+// to detect/avoid duplicate submissions before proving).
+export circuit isNullifierSpent(nul: Bytes<32>): Boolean {
+  return spentNullifiers.member(disclose(nul));
+}

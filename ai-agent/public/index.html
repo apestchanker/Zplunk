@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ZKSplunk — zkZap Analyst</title>
+  <style>
+    :root { --bg:#0b0f14; --panel:#121822; --line:#1f2a37; --txt:#e6edf3; --mut:#8b98a8; --accent:#65A637; --crit:#D41F1F; }
+    * { box-sizing:border-box; }
+    body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--txt); }
+    header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; align-items:center; gap:10px; }
+    header b { color:var(--accent); }
+    header .status { margin-left:auto; font-size:12px; color:var(--mut); }
+    main { max-width:880px; margin:0 auto; padding:18px; }
+    .boundary { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 14px; color:var(--mut); font-size:13px; margin-bottom:16px; }
+    #log { display:flex; flex-direction:column; gap:14px; }
+    .msg { border:1px solid var(--line); border-radius:10px; padding:12px 14px; background:var(--panel); white-space:pre-wrap; }
+    .msg.user { background:#0e1620; border-color:#21405c; }
+    .msg .who { font-size:12px; color:var(--mut); margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em; }
+    .tag { display:inline-block; font-size:11px; padding:1px 8px; border-radius:999px; border:1px solid var(--line); margin-left:6px; }
+    form { display:flex; gap:8px; margin-top:18px; position:sticky; bottom:0; padding:12px 0; background:linear-gradient(transparent, var(--bg) 30%); }
+    input { flex:1; padding:12px 14px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--txt); font-size:15px; }
+    button { padding:12px 18px; border-radius:8px; border:0; background:var(--accent); color:#07120a; font-weight:600; cursor:pointer; }
+    button:disabled { opacity:.5; cursor:default; }
+    .chips { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
+    .chip { font-size:12px; color:var(--mut); border:1px dashed var(--line); border-radius:999px; padding:5px 10px; cursor:pointer; }
+    .chip:hover { color:var(--txt); border-color:var(--accent); }
+    code { background:#0e1620; padding:1px 5px; border-radius:4px; }
+  </style>
+</head>
+<body>
+  <header>
+    <b>ZKSplunk</b> · zkZap analyst
+    <span class="status" id="status">checking…</span>
+  </header>
+  <main>
+    <div class="boundary">
+      Metadata and volumes are public. Contents are private. ZKSplunk observes public proof-server, indexer,
+      node, and contract metadata — never private Midnight state, witness arguments, shielded parties, or shielded amounts.
+    </div>
+
+    <div class="chips" id="chips">
+      <span class="chip">Are the proof server, indexer, and node healthy right now?</span>
+      <span class="chip">What happened in the last 15 minutes, and what evidence supports it?</span>
+      <span class="chip">Which component is most degraded and why?</span>
+      <span class="chip">Did any alert rule condition become true?</span>
+    </div>
+
+    <div id="log"></div>
+
+    <form id="form">
+      <input id="q" autocomplete="off" placeholder="Ask about Midnight component health…" />
+      <button id="send" type="submit">Ask</button>
+    </form>
+  </main>
+
+  <script>
+    const log = document.getElementById('log');
+    const form = document.getElementById('form');
+    const input = document.getElementById('q');
+    const sendBtn = document.getElementById('send');
+    const statusEl = document.getElementById('status');
+
+    function add(who, text, tag) {
+      const el = document.createElement('div');
+      el.className = 'msg ' + (who === 'You' ? 'user' : 'analyst');
+      const tagHtml = tag ? '<span class="tag">' + tag + '</span>' : '';
+      el.innerHTML = '<div class="who">' + who + tagHtml + '</div>' + render(text);
+      log.appendChild(el);
+      el.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      return el;
+    }
+    // Tiny markdown: **bold**, `code`, and line breaks (kept minimal & safe).
+    function render(s) {
+      const esc = s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return esc
+        .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+        .replace(/`(.+?)`/g, '<code>$1</code>')
+        .replace(/\*(.+?)\*/g, '<i>$1</i>');
+    }
+
+    async function refreshStatus() {
+      try {
+        const r = await fetch('/api/health').then(r => r.json());
+        statusEl.textContent =
+          (r.splunk?.ok ? 'Splunk ✓' : 'Splunk ✗') +
+          ' · ' + (r.mcpConfigured ? 'MCP' : 'REST') +
+          ' · ' + (r.llm ? 'LLM on' : 'LLM off');
+      } catch { statusEl.textContent = 'agent offline'; }
+    }
+
+    async function ask(question) {
+      add('You', question);
+      input.value = '';
+      sendBtn.disabled = true;
+      const pending = add('zkZap', '…analyzing Splunk evidence…');
+      try {
+        const r = await fetch('/api/ask', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ question }),
+        }).then(r => r.json());
+        if (r.error) { pending.innerHTML = '<div class="who">zkZap</div>' + render('Error: ' + r.error); }
+        else {
+          const tag = r.classification + ' · ' + r.evidenceSource + (r.phrasedByLlm ? ' · llm' : '');
+          pending.outerHTML = '';
+          add('zkZap', r.markdown, tag);
+        }
+      } catch (e) {
+        pending.innerHTML = '<div class="who">zkZap</div>' + render('Request failed: ' + e.message);
+      } finally {
+        sendBtn.disabled = false;
+        input.focus();
+      }
+    }
+
+    form.addEventListener('submit', (e) => { e.preventDefault(); if (input.value.trim()) ask(input.value.trim()); });
+    document.getElementById('chips').addEventListener('click', (e) => {
+      if (e.target.classList.contains('chip')) ask(e.target.textContent);
+    });
+    refreshStatus();
+    setInterval(refreshStatus, 15000);
+  </script>
+</body>
+</html>

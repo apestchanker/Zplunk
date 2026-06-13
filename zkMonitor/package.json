@@ -1,0 +1,51 @@
+{
+  "name": "@zksplunk/zkmonitor",
+  "version": "0.1.0",
+  "description": "ZKSplunk zkMonitor — live wiring: real vitals (HTTP) → Splunk Cloud HEC → optional on-chain attestation",
+  "author": "John Santi <bytewizard42i@github.com>",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "deploy": "tsx src/deploy-attestation.ts",
+    "relayer": "tsx src/attestation-relayer.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-js": "2.5.1",
+    "@midnight-ntwrk/compact-runtime": "0.16.0",
+    "@midnight-ntwrk/midnight-js-contracts": "4.1.1",
+    "@midnight-ntwrk/midnight-js-http-client-proof-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-indexer-public-data-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-level-private-state-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-network-id": "4.1.1",
+    "@midnight-ntwrk/midnight-js-node-zk-config-provider": "4.1.1",
+    "@midnight-ntwrk/midnight-js-types": "4.1.1",
+    "@midnight-ntwrk/ledger-v8": "8.1.0",
+    "@midnight-ntwrk/wallet-sdk-abstractions": "2.1.0",
+    "@midnight-ntwrk/wallet-sdk-dust-wallet": "4.1.0",
+    "@midnight-ntwrk/wallet-sdk-facade": "4.0.1",
+    "@midnight-ntwrk/wallet-sdk-hd": "3.0.2",
+    "@midnight-ntwrk/wallet-sdk-shielded": "3.0.1",
+    "@midnight-ntwrk/wallet-sdk-unshielded-wallet": "3.1.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.10",
+    "tsx": "^4.22.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "keywords": [
+    "zksplunk",
+    "midnight",
+    "splunk",
+    "zkmonitor",
+    "hec",
+    "observability"
+  ]
+}

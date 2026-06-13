@@ -1,0 +1,22 @@
+{
+  "name": "@zksplunk/ai-agent",
+  "version": "0.1.0",
+  "description": "ZKSplunk zkZap analyst — evidence-based MCP/chat over Splunk for Midnight component health",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "start": "tsx src/server.ts",
+    "cert:localhost": "sh scripts/create-local-https-cert.sh",
+    "splunk:trust-chat": "sh scripts/configure-splunk-trusted-domain.sh",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.22.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.6.0"
+  },
+  "keywords": ["zksplunk", "midnight", "splunk", "mcp", "analyst", "observability"]
+}

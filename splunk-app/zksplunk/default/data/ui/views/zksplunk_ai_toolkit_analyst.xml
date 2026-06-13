@@ -1,0 +1,112 @@
+<form version="1.1" theme="dark">
+  <label>ZKSplunk AI Toolkit Analyst</label>
+  <description>Ask operational questions inside Splunk. Evidence comes from index=zksplunk; phrasing uses Splunk AI Toolkit's ai command with the configured Gemini connection.</description>
+
+  <fieldset submitButton="true" autoRun="false">
+    <input type="text" token="question" searchWhenChanged="false">
+      <label>Question</label>
+      <default>What is unhealthy right now, and what should I check first?</default>
+      <initialValue>What is unhealthy right now, and what should I check first?</initialValue>
+    </input>
+    <input type="time" token="time_window" searchWhenChanged="false">
+      <label>Evidence window</label>
+      <default>
+        <earliest>-15m</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <html>
+        <style>
+          .zk-native-note {
+            padding: 16px 18px;
+            border: 1px solid #263241;
+            background: #071018;
+            color: #d7dee8;
+            line-height: 1.45;
+          }
+          .zk-native-note strong {
+            color: #ffffff;
+          }
+          .zk-native-note code {
+            color: #9fd274;
+            background: rgba(127, 190, 84, .12);
+            padding: 1px 4px;
+            border-radius: 3px;
+          }
+        </style>
+        <div class="zk-native-note">
+          <strong>Native Splunk AI path.</strong>
+          This tab gathers live ZKSplunk evidence with SPL, then calls Splunk AI Toolkit through <code>| ai</code>.
+          The tested connection is <code>ZKSplunk2</code>: <code>provider=Gemini</code>, <code>model=gemini-3.5-flash</code>.
+          The local demo configuration marks <code>| ai</code> as trusted for dashboards to avoid Splunk's risky-command confirmation gate.
+          If the answer panel errors, install/configure Splunk AI Toolkit and grant the user <code>apply_ai_commander_command</code>.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>AI Toolkit Answer</title>
+      <table>
+        <search>
+          <query>
+index=zksplunk earliest=$time_window.earliest$ latest=$time_window.latest$ (sourcetype="midnight:vitals" OR sourcetype="midnight:chain" OR sourcetype="midnight:contracts" OR sourcetype="zksplunk:connector")
+| eval component=coalesce(component,"global")
+| eval signal=case(
+    sourcetype=="midnight:vitals", component . ": status=" . coalesce(status,"unknown") . ", severity=" . coalesce(severity,"unknown") . ", latency_ms=" . coalesce(response_time_ms,"-") . ", message=" . coalesce(message,""),
+    sourcetype=="midnight:chain", "chain: block_height=" . coalesce(block_height,"-") . ", block_age_seconds=" . coalesce(block_age_seconds,"-") . ", protocol=" . coalesce(protocol_version,"-"),
+    sourcetype=="zksplunk:connector", "connector: sent=" . coalesce(total_events_sent,"-") . ", failed=" . coalesce(total_events_failed,"-") . ", failed_since_heartbeat=" . coalesce(failed_events_since_last_heartbeat,"-") . ", queue=" . coalesce(queued_events,"-"),
+    sourcetype=="midnight:contracts", "contracts: " . coalesce(type,"event") . ", status=" . coalesce(status,"unknown") . ", message=" . coalesce(message,""),
+    true(), sourcetype . ": " . coalesce(type,"event")
+  )
+| stats latest(signal) as signal by sourcetype component type
+| stats values(signal) as evidence
+| eval question=$question|s$
+| eval prompt="You are zkZap, the ZKSplunk analyst. Answer the operator question using only the live Splunk evidence below. Do not claim visibility into private Midnight state, witness values, shielded parties, or shielded amounts. Include classification, evidence, impact, and recommended action. Question: " . question . " Evidence: " . mvjoin(evidence,"; ")
+| ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash
+| eval answer=coalesce(ai_result,ai_result_1,response,answer,"Splunk AI Toolkit returned no answer. Check the AI Toolkit provider/model configuration and user permissions.")
+| table answer
+          </query>
+        </search>
+        <option name="count">1</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Evidence Sent To AI Toolkit</title>
+      <table>
+        <search>
+          <query>
+index=zksplunk earliest=$time_window.earliest$ latest=$time_window.latest$ (sourcetype="midnight:vitals" OR sourcetype="midnight:chain" OR sourcetype="midnight:contracts" OR sourcetype="zksplunk:connector")
+| eval component=coalesce(component,"global")
+| eval signal=case(
+    sourcetype=="midnight:vitals", component . ": status=" . coalesce(status,"unknown") . ", severity=" . coalesce(severity,"unknown") . ", latency_ms=" . coalesce(response_time_ms,"-") . ", message=" . coalesce(message,""),
+    sourcetype=="midnight:chain", "chain: block_height=" . coalesce(block_height,"-") . ", block_age_seconds=" . coalesce(block_age_seconds,"-") . ", protocol=" . coalesce(protocol_version,"-"),
+    sourcetype=="zksplunk:connector", "connector: sent=" . coalesce(total_events_sent,"-") . ", failed=" . coalesce(total_events_failed,"-") . ", failed_since_heartbeat=" . coalesce(failed_events_since_last_heartbeat,"-") . ", queue=" . coalesce(queued_events,"-"),
+    sourcetype=="midnight:contracts", "contracts: " . coalesce(type,"event") . ", status=" . coalesce(status,"unknown") . ", message=" . coalesce(message,""),
+    true(), sourcetype . ": " . coalesce(type,"event")
+  )
+| stats latest(signal) as latest_evidence latest(_time) as last_seen by sourcetype component type
+| eval last_seen=strftime(last_seen,"%Y-%m-%d %H:%M:%S %Z")
+| sort sourcetype component type
+| table last_seen sourcetype component type latest_evidence
+          </query>
+        </search>
+        <option name="count">12</option>
+        <option name="drilldown">none</option>
+        <option name="refresh.display">progressbar</option>
+        <option name="wrap">true</option>
+      </table>
+    </panel>
+  </row>
+</form>

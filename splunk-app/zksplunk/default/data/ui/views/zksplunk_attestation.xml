@@ -1,0 +1,184 @@
+<dashboard version="1.1" theme="dark">
+  <label>zkZap Attestation</label>
+  <description>Anonymous critical-incident attestation pipeline: critical detected → proven (collector) → relayed + DUST-merged (system relayer) → confirmed on-chain. Only the anonymized incident class is public; the operator and node are never revealed.</description>
+
+  <fieldset submitButton="false" autoRun="true">
+    <input type="time" token="tr">
+      <label>Time range</label>
+      <default>
+        <earliest>-24h@h</earliest>
+        <latest>now</latest>
+      </default>
+    </input>
+  </fieldset>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:8px 12px; color:#d3dae3;">
+          <b style="color:#65A637;">Pipeline:</b> critical alarm → collector proves (no wallet) → relayer merges DUST fee + submits → on-chain. <b>Public:</b> incident class + severity only. <b>Hidden:</b> operator, node, payload.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Critical incidents detected (collector)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" type="midnight.vital.check" status="critical" | stats count</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,1]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Attestations submitted on-chain</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" type="zksplunk.relayer.submitted" | stats count</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="rangeColors">["0x708794","0x53a051"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Relay failures</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" type="zksplunk.relayer.failed" | stats count</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Relayer liveness (s since heartbeat)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" type="zksplunk.relayer.heartbeat" | stats latest(_time) as last | eval secs=round(now()-last)</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="field">secs</option>
+        <option name="unit">s</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[90,180]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Relayer pipeline over time (received · denied · submitted · failed)</title>
+      <chart>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" (type="zksplunk.relayer.received" OR type="zksplunk.relayer.denied" OR type="zksplunk.relayer.submitted" OR type="zksplunk.relayer.failed")
+| eval stage=case(type=="zksplunk.relayer.received","received", type=="zksplunk.relayer.denied","denied", type=="zksplunk.relayer.submitted","submitted", type=="zksplunk.relayer.failed","failed")
+| timechart span=5m count by stage</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.stackMode">stacked</option>
+        <option name="charting.axisTitleY.text">events</option>
+        <option name="charting.fieldColors">{"received":0x708794,"submitted":0x53a051,"denied":0xf8be34,"failed":0xdc4e41}</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>On-chain submit latency (ms)</title>
+      <chart>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" type="zksplunk.relayer.submitted" latency_ms=*
+| timechart span=5m avg(latency_ms) as avg_ms perc95(latency_ms) as p95_ms</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">line</option>
+        <option name="charting.axisTitleY.text">ms</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Anonymized incident classes (public Macro signal)</title>
+      <chart>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" type="zksplunk.relayer.submitted" incident_class=*
+| stats count by incident_class | sort -count</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">pie</option>
+        <option name="charting.legend.placement">right</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Recent on-chain attestations (anonymous — no operator/node)</title>
+      <table>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" type="zksplunk.relayer.submitted"
+| sort -_time
+| table _time incident_class severity tx_hash block_height latency_ms</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">20</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Recent rejections &amp; failures (reason / category only — no IP)</title>
+      <table>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:relayer" (type="zksplunk.relayer.denied" OR type="zksplunk.relayer.failed")
+| sort -_time
+| eval detail=coalesce(reason, error_category)
+| table _time type incident_class detail latency_ms</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">20</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

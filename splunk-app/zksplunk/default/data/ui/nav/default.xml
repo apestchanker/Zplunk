@@ -1,0 +1,18 @@
+<nav search_view="search" color="#65A637">
+  <view name="zksplunk_global_map" default="true" />
+  <view name="zksplunk_component_detail" />
+  <view name="zksplunk_operator_summary" />
+  <view name="zksplunk_mcp_analyst" />
+  <view name="zksplunk_ai_toolkit_analyst" />
+  <view name="zksplunk_overview" />
+  <view name="zksplunk_attestation" />
+  <view name="search" />
+  <collection label="Alerts">
+    <saved source="unclassified" match="ZKSplunk" />
+  </collection>
+  <collection label="Settings">
+    <view name="dashboards" />
+    <view name="reports" />
+    <view name="alerts" />
+  </collection>
+</nav>

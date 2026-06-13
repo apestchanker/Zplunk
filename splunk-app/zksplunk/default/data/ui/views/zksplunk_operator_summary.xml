@@ -1,0 +1,155 @@
+<dashboard version="1.1" theme="dark">
+  <label>ZKSplunk Operator Summary</label>
+  <description>Functional cluster summary for the 1AM Midnight node operator.</description>
+
+  <row>
+    <panel>
+      <html>
+        <style>
+          .zk-tabs { display:flex; gap:8px; align-items:center; padding:2px 0 8px; }
+          .zk-tabs a { color:#c8d2df; text-decoration:none; border:1px solid #263241; background:#101820; padding:7px 11px; border-radius:4px; font-weight:600; }
+          .zk-tabs a.active { color:#07120a; border-color:#65A637; background:#65A637; }
+          .zk-tabs .spacer { flex:1; }
+        </style>
+        <div class="zk-tabs">
+          <a href="/app/zksplunk/zksplunk_global_map">Global Map</a>
+          <a href="/app/zksplunk/zksplunk_component_detail">Component Detail</a>
+          <a href="/app/zksplunk/zksplunk_overview">Overview</a>
+          <a href="/app/zksplunk/zksplunk_mcp_analyst">MCP Analyst</a>
+          <span class="spacer"></span>
+          <a class="active" href="/app/zksplunk/zksplunk_operator_summary">1AM Operator</a>
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>1AM Operator cluster health</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| stats latest(status) as status latest(severity) as severity by component
+| eval status=coalesce(status,severity,"unknown")
+| stats count(eval(status="critical" OR status="error")) as critical count(eval(status="warning" OR status="warn")) as warning count as components
+| eval cluster_status=case(critical&gt;0,"critical",warning&gt;0,"warning",components&gt;0,"healthy",true(),"unknown")
+| table cluster_status</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorBy">value</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53A051","0xF8BE34","0xDC4E41","0x708794"]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Components</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| stats latest(status) as status by component
+| stats count as components</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+      </single>
+    </panel>
+    <panel>
+      <title>Warnings</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| stats latest(status) as status latest(severity) as severity by component
+| eval status=coalesce(status,severity,"unknown")
+| where status="warning" OR status="warn"
+| stats count as warnings</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53A051","0xF8BE34"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Critical</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| stats latest(status) as status latest(severity) as severity by component
+| eval status=coalesce(status,severity,"unknown")
+| where status="critical" OR status="error"
+| stats count as critical</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53A051","0xDC4E41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Functional unit: component status and geography</title>
+      <table>
+        <search>
+          <query>| inputlookup zksplunk_component_locations.csv
+| join type=left component [
+  search index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+  | stats latest(status) as status latest(severity) as severity latest(response_time_ms) as response_time_ms latest(_time) as last_update latest(message) as message by component
+]
+| eval status=coalesce(status,severity,"unknown")
+| eval response_time_ms=coalesce(response_time_ms,"-")
+| eval last_update=if(isnull(last_update),"no data",strftime(last_update,"%H:%M:%S"))
+| table operator_id component component_type location_label status response_time_ms last_update message
+| sort component</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">row</option>
+        <drilldown>
+          <link>/app/zksplunk/zksplunk_component_detail?form.component=$row.component$</link>
+        </drilldown>
+        <format type="color" field="status">
+          <colorPalette type="map">{"healthy":0x53A051,"warning":0xF8BE34,"critical":0xDC4E41,"unknown":0x708794,"tracked":0x1182F3}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Recent alertable conditions</title>
+      <table>
+        <search>
+          <query>index=zksplunk earliest=-60m
+| where status="critical" OR severity="critical" OR send_status="failed"
+| eval t=strftime(_time,"%Y-%m-%d %H:%M:%S")
+| table t component type status severity response_time_ms message error_message
+| sort -t</query>
+          <earliest>-60m</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">20</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+</dashboard>

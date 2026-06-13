@@ -1,0 +1,211 @@
+<dashboard version="1.1" theme="dark">
+  <label>ZKSplunk Overview</label>
+  <description>Midnight component health from public infrastructure metadata. Contents are private; ZKSplunk observes metadata and volumes only.</description>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:8px 12px; color:#d3dae3;">
+          <b style="color:#5cc05c;">Privacy boundary:</b> ZKSplunk monitors public proof-server, indexer, node, and contract metadata.
+          It does <b>not</b> observe private Midnight state, witness arguments, shielded parties, or shielded amounts.
+          &#160;&#8212;&#160; <a href="http://localhost:8787" target="_blank">Open the MCP/chat analyst &#8594;</a>
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Current Component Health (latest per component, last 15m)</title>
+      <table>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| eval response_time_ms=if(isnull(response_time_ms),"-",response_time_ms)
+| stats latest(status) as status latest(severity) as severity latest(response_time_ms) as response_time_ms latest(message) as message latest(_time) as last_update by component
+| eval last_update=strftime(last_update,"%H:%M:%S")
+| table component status severity response_time_ms last_update message
+| sort component</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">row</option>
+        <option name="count">20</option>
+        <drilldown>
+          <link target="_blank">/app/zksplunk/zksplunk_component_detail?form.component=$row.component$</link>
+        </drilldown>
+        <format type="color" field="status">
+          <colorPalette type="map">{"healthy":0x53A051,"warning":0xF8BE34,"critical":0xDC4E41,"unknown":0x708794,"tracked":0x1182F3}</colorPalette>
+        </format>
+        <format type="color" field="severity">
+          <colorPalette type="map">{"info":0x53A051,"warn":0xF8BE34,"critical":0xDC4E41,"error":0xDC4E41}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Critical components now</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" type="midnight.vital.check" earliest=-15m
+| stats latest(status) as status by component
+| where status="critical"
+| stats count as critical</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Proof server p95 latency (ms, 15m)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" component="proof-server" type="midnight.vital.check" response_time_ms=* earliest=-15m
+| stats perc95(response_time_ms) as p95</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1000,2000]</option>
+        <option name="useColors">1</option>
+        <option name="unit">ms</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Latest block height</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:chain" type="midnight.chain.block_latest" block_height=* earliest=-30m
+| stats latest(block_height) as block_height</query>
+          <earliest>-30m</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Connector: new failures (15m)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:connector" type="zksplunk.connector.status" earliest=-15m
+| stats max(failed_events_since_last_heartbeat) as failed
+| eval failed=coalesce(failed,0)</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Proof server latency (avg / p95) — red bar = outage</title>
+      <chart>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" component="proof-server" type="midnight.vital.check" earliest=-30m
+| timechart span=1m avg(response_time_ms) as avg_latency_ms perc95(response_time_ms) as p95_latency_ms count(eval(status="critical")) as critical_count
+| eventstats max(p95_latency_ms) as _scale
+| eval outage=if(critical_count&gt;0, round(coalesce(_scale, 100)*1.1), null())
+| fields - critical_count _scale</query>
+          <earliest>-30m</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.overlayFields">avg_latency_ms,p95_latency_ms</option>
+        <option name="charting.fieldColors">{"outage":0xDC4E41,"avg_latency_ms":0x53A051,"p95_latency_ms":0xF8BE34}</option>
+        <option name="charting.axisTitleY.text">ms</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+    <panel>
+      <title>Indexer latency (avg / p95) — red bar = outage</title>
+      <chart>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" component="indexer" type="midnight.vital.check" earliest=-30m
+| timechart span=1m avg(response_time_ms) as avg_latency_ms perc95(response_time_ms) as p95_latency_ms count(eval(status="critical")) as critical_count
+| eventstats max(p95_latency_ms) as _scale
+| eval outage=if(critical_count&gt;0, round(coalesce(_scale, 100)*1.1), null())
+| fields - critical_count _scale</query>
+          <earliest>-30m</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="charting.chart">column</option>
+        <option name="charting.chart.overlayFields">avg_latency_ms,p95_latency_ms</option>
+        <option name="charting.fieldColors">{"outage":0xDC4E41,"avg_latency_ms":0x53A051,"p95_latency_ms":0xF8BE34}</option>
+        <option name="charting.axisTitleY.text">ms</option>
+        <option name="charting.legend.placement">bottom</option>
+      </chart>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Connector heartbeat (latest)</title>
+      <table>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:connector" type="zksplunk.connector.status" earliest=-15m
+| stats latest(_time) as last_seen latest(total_events_sent) as total_events_sent latest(total_events_failed) as total_events_failed latest(failed_events_since_last_heartbeat) as failed_events_since_last_heartbeat latest(queued_events) as queued_events latest(average_latency_ms) as average_latency_ms latest(scheduler_active) as scheduler_active
+| eval seconds_since_heartbeat=round(now()-last_seen)
+| eval last_seen=strftime(last_seen,"%H:%M:%S")
+| table last_seen seconds_since_heartbeat total_events_sent total_events_failed failed_events_since_last_heartbeat queued_events average_latency_ms scheduler_active</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Recent alertable conditions (last 15m)</title>
+      <table>
+        <search>
+          <query>index=zksplunk earliest=-15m
+| where status="critical" OR severity="critical" OR send_status="failed"
+| eval t=strftime(_time,"%H:%M:%S")
+| table t component type status severity response_time_ms message error_message
+| sort -t</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+        <option name="count">25</option>
+        <format type="color" field="status">
+          <colorPalette type="map">{"healthy":0x53A051,"warning":0xF8BE34,"critical":0xDC4E41,"unknown":0x708794,"tracked":0x1182F3}</colorPalette>
+        </format>
+      </table>
+    </panel>
+  </row>
+</dashboard>

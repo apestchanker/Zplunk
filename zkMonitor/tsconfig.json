@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "noImplicitAny": false,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@midnight-ntwrk/compact-runtime": ["node_modules/@midnight-ntwrk/compact-runtime"]
+    }
+  },
+  "include": [
+    "src/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

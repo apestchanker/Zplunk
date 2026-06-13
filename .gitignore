@@ -1,0 +1,46 @@
+# Dependencies
+node_modules/
+
+# Environment
+.env
+.env.local
+.env.*.local
+ai-agent/certs/
+
+# Build
+dist/
+build/
+contract/managed/
+
+# Splunk
+local/
+*.pyc
+
+# IDE
+.vscode/
+.idea/
+.claude/settings.local.json
+.midnight-expert/settings.local.json
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Local JSONL sink output
+demoLand/out/
+realDeal/out/
+out/
+*.jsonl
+
+# Local implementation notes and working plans
+implementation/
+
+# Large local reference media (Splunk demo videos) — too big for git (use LFS/external if needed)
+media/
+*.mp4

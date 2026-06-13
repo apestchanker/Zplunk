@@ -1,0 +1,493 @@
+<dashboard version="1.1" theme="dark">
+  <label>ZKSplunk Global Map</label>
+  <description>Midnight node-operator topology with geographic component health.</description>
+
+  <init>
+    <set token="indexer_status">unknown</set>
+    <set token="indexer_color">#7b8a97</set>
+    <set token="indexer_latency">-</set>
+    <set token="node_status">unknown</set>
+    <set token="node_color">#7b8a97</set>
+    <set token="node_latency">-</set>
+    <set token="proof_status">unknown</set>
+    <set token="proof_color">#7b8a97</set>
+    <set token="proof_latency">-</set>
+    <set token="wallet_status">unknown</set>
+    <set token="wallet_color">#7b8a97</set>
+    <set token="wallet_latency">-</set>
+    <set token="cluster_status">unknown</set>
+    <set token="cluster_color">#7b8a97</set>
+    <set token="cluster_components">4</set>
+    <set token="cluster_warning">0</set>
+    <set token="cluster_critical">0</set>
+    <set token="cluster_last_update">no data</set>
+    <set token="proof_p95">-</set>
+    <set token="indexer_p95">-</set>
+    <set token="hec_failed">0</set>
+  </init>
+
+  <search id="indexer_status">
+    <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") component="indexer" earliest=-15m
+| stats latest(status) as status latest(severity) as severity latest(response_time_ms) as response_time_ms latest(_time) as last_update
+| eval status=coalesce(status,severity,"unknown")
+| eval marker_color=case(status="healthy" OR status="info" OR status="tracked","#65A637",status="warning" OR status="warn","#F6C453",status="critical" OR status="error","#D95A4E",true(),"#7b8a97")
+| eval response_time_ms=coalesce(response_time_ms,"-")
+| table status marker_color response_time_ms</query>
+    <earliest>-15m</earliest>
+    <latest>now</latest>
+    <refresh>20s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="indexer_status">$result.status$</set>
+      <set token="indexer_color">$result.marker_color$</set>
+      <set token="indexer_latency">$result.response_time_ms$</set>
+    </done>
+  </search>
+
+  <search id="node_status">
+    <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="midnight:chain") component="node" earliest=-15m
+| stats latest(status) as status latest(severity) as severity latest(response_time_ms) as response_time_ms
+| eval status=coalesce(status,severity,"unknown")
+| eval marker_color=case(status="healthy" OR status="info" OR status="tracked","#65A637",status="warning" OR status="warn","#F6C453",status="critical" OR status="error","#D95A4E",true(),"#7b8a97")
+| eval response_time_ms=coalesce(response_time_ms,"-")
+| table status marker_color response_time_ms</query>
+    <earliest>-15m</earliest>
+    <latest>now</latest>
+    <refresh>20s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="node_status">$result.status$</set>
+      <set token="node_color">$result.marker_color$</set>
+      <set token="node_latency">$result.response_time_ms$</set>
+    </done>
+  </search>
+
+  <search id="proof_status">
+    <query>index=zksplunk sourcetype="midnight:vitals" component="proof-server" earliest=-15m
+| stats latest(status) as status latest(severity) as severity latest(response_time_ms) as response_time_ms
+| eval status=coalesce(status,severity,"unknown")
+| eval marker_color=case(status="healthy" OR status="info" OR status="tracked","#65A637",status="warning" OR status="warn","#F6C453",status="critical" OR status="error","#D95A4E",true(),"#7b8a97")
+| eval response_time_ms=coalesce(response_time_ms,"-")
+| table status marker_color response_time_ms</query>
+    <earliest>-15m</earliest>
+    <latest>now</latest>
+    <refresh>20s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="proof_status">$result.status$</set>
+      <set token="proof_color">$result.marker_color$</set>
+      <set token="proof_latency">$result.response_time_ms$</set>
+    </done>
+  </search>
+
+  <search id="wallet_status">
+    <query>index=zksplunk sourcetype="midnight:vitals" component="wallet" earliest=-15m
+| stats latest(status) as status latest(severity) as severity latest(response_time_ms) as response_time_ms
+| eval status=coalesce(status,severity,"unknown")
+| eval marker_color=case(status="healthy" OR status="info" OR status="tracked","#65A637",status="warning" OR status="warn","#F6C453",status="critical" OR status="error","#D95A4E",true(),"#7b8a97")
+| eval response_time_ms=coalesce(response_time_ms,"-")
+| table status marker_color response_time_ms</query>
+    <earliest>-15m</earliest>
+    <latest>now</latest>
+    <refresh>20s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="wallet_status">$result.status$</set>
+      <set token="wallet_color">$result.marker_color$</set>
+      <set token="wallet_latency">$result.response_time_ms$</set>
+    </done>
+  </search>
+
+  <search id="cluster_status">
+    <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| stats latest(status) as status latest(severity) as severity latest(_time) as last_update by component
+| eval status=coalesce(status,severity,"unknown")
+| stats count as components count(eval(status="critical" OR status="error")) as critical count(eval(status="warning" OR status="warn")) as warning latest(last_update) as last_update
+| eval cluster_status=case(critical&gt;0,"critical",warning&gt;0,"warning",components&gt;0,"healthy",true(),"unknown")
+| eval cluster_color=case(cluster_status="healthy","#65A637",cluster_status="warning","#F6C453",cluster_status="critical","#D95A4E",true(),"#7b8a97")
+| eval last_update=if(isnull(last_update),"no data",strftime(last_update,"%H:%M:%S"))
+| table cluster_status cluster_color components critical warning last_update</query>
+    <earliest>-15m</earliest>
+    <latest>now</latest>
+    <refresh>20s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="cluster_status">$result.cluster_status$</set>
+      <set token="cluster_color">$result.cluster_color$</set>
+      <set token="cluster_components">$result.components$</set>
+      <set token="cluster_critical">$result.critical$</set>
+      <set token="cluster_warning">$result.warning$</set>
+      <set token="cluster_last_update">$result.last_update$</set>
+    </done>
+  </search>
+
+  <search id="kpis">
+    <query>index=zksplunk earliest=-15m
+| eventstats count(eval(status="critical")) as critical_count
+| eventstats perc95(eval(if(component="proof-server",response_time_ms,null()))) as proof_p95
+| eventstats perc95(eval(if(component="indexer",response_time_ms,null()))) as indexer_p95
+| eventstats max(failed_events_since_last_heartbeat) as hec_failed
+| head 1
+| eval proof_p95=if(isnull(proof_p95),"-",round(proof_p95,0)." ms")
+| eval indexer_p95=if(isnull(indexer_p95),"-",round(indexer_p95,0)." ms")
+| eval hec_failed=coalesce(hec_failed,0)
+| table critical_count proof_p95 indexer_p95 hec_failed</query>
+    <earliest>-15m</earliest>
+    <latest>now</latest>
+    <refresh>30s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="critical_count">$result.critical_count$</set>
+      <set token="proof_p95">$result.proof_p95$</set>
+      <set token="indexer_p95">$result.indexer_p95$</set>
+      <set token="hec_failed">$result.hec_failed$</set>
+    </done>
+  </search>
+
+  <row>
+    <panel>
+      <html>
+        <style>
+          .dashboard-row .dashboard-panel { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+          .dashboard-row .panel-body.html { padding: 0 !important; }
+          .zk-home {
+            --bg: #070c12;
+            --panel: rgba(10, 18, 28, .82);
+            --panel2: rgba(13, 25, 38, .74);
+            --line: rgba(125, 169, 204, .22);
+            --text: #edf5fb;
+            --muted: #90a1b4;
+            min-height: 780px;
+            overflow: hidden;
+            position: relative;
+            border: 1px solid rgba(130, 170, 210, .18);
+            background:
+              radial-gradient(circle at 20% 14%, rgba(101,166,55,.12), transparent 30%),
+              radial-gradient(circle at 76% 30%, rgba(57,124,190,.12), transparent 34%),
+              #070c12;
+            color: var(--text);
+            font-family: "Avenir Next", "Helvetica Neue", Helvetica, Arial, sans-serif;
+          }
+          .zk-home * { box-sizing: border-box; }
+          .zk-home a { color: inherit; text-decoration: none; }
+          .zk-top {
+            position: relative;
+            z-index: 5;
+            height: 70px;
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            padding: 0 24px;
+            border-bottom: 1px solid var(--line);
+            background: rgba(6, 11, 17, .78);
+            backdrop-filter: blur(12px);
+          }
+          .zk-brand { font-size: 25px; line-height: 1; font-weight: 900; letter-spacing: 0; }
+          .zk-brand span { color: #84c65a; }
+          .zk-tabs { display: flex; gap: 4px; margin-left: 12px; }
+          .zk-tab {
+            height: 34px;
+            display: inline-flex;
+            align-items: center;
+            padding: 0 13px;
+            border: 1px solid transparent;
+            color: #aebccc;
+            font-weight: 700;
+            font-size: 13px;
+          }
+          .zk-tab.active {
+            color: #07120a;
+            background: #7dbb55;
+            border-color: #96d36d;
+            border-radius: 5px;
+          }
+          .zk-top-spacer { flex: 1; }
+          .zk-pill {
+            border: 1px solid $cluster_color$;
+            color: #e9f2fb;
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: color-mix(in srgb, $cluster_color$ 18%, transparent);
+            font-weight: 800;
+            font-size: 12px;
+            text-transform: uppercase;
+          }
+          .zk-stage {
+            position: absolute;
+            inset: 70px 0 0;
+            display: grid;
+            grid-template-columns: minmax(720px, 1fr) 330px;
+            grid-template-rows: 1fr 122px;
+            gap: 14px;
+            padding: 18px;
+          }
+          .zk-map-panel {
+            grid-row: 1 / 2;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            background: #071018;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.02), 0 24px 70px rgba(0,0,0,.3);
+          }
+          .zk-map-panel:before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background-image:
+              linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+              url("/static/app/zksplunk/zksplunk-world-map.png");
+            background-size: 48px 48px, 48px 48px, cover;
+            background-position: center;
+            filter: saturate(1.05) contrast(1.05);
+            opacity: .94;
+          }
+          .zk-map-panel:after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background:
+              linear-gradient(90deg, rgba(7,12,18,.12), transparent 16%, transparent 80%, rgba(7,12,18,.28)),
+              radial-gradient(circle at 32% 45%, rgba(101,166,55,.12), transparent 20%),
+              radial-gradient(circle at 30% 70%, rgba(246,196,83,.1), transparent 18%);
+            pointer-events: none;
+          }
+          .zk-map-title {
+            position: absolute;
+            z-index: 3;
+            top: 20px;
+            left: 22px;
+          }
+          .zk-map-title h2 { margin: 0; font-size: 24px; line-height: 1.05; letter-spacing: 0; }
+          .zk-map-title p { margin: 7px 0 0; color: var(--muted); font-size: 13px; }
+          .zk-routes {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            display: block;
+            z-index: 2;
+            pointer-events: none;
+          }
+          .zk-routes line {
+            fill: none;
+            stroke: rgba(141, 187, 222, .55);
+            stroke-width: 2;
+            vector-effect: non-scaling-stroke;
+            stroke-dasharray: 7 7;
+            filter: drop-shadow(0 0 7px rgba(82, 151, 207, .35));
+          }
+          .zk-routes line.hot { stroke: $cluster_color$; stroke-width: 3; vector-effect: non-scaling-stroke; }
+          .zk-marker {
+            position: absolute;
+            z-index: 4;
+            transform: translate(-50%, -50%);
+            display: block;
+            min-width: 170px;
+          }
+          .zk-pin {
+            width: 48px;
+            height: 48px;
+            display: grid;
+            place-items: center;
+            border-radius: 50%;
+            color: #eef8ff;
+            font-weight: 900;
+            font-size: 13px;
+            background: rgba(8, 16, 24, .92);
+            border: 4px solid var(--marker-color, currentColor);
+            box-shadow: 0 0 0 8px color-mix(in srgb, var(--marker-color, currentColor) 24%, transparent), 0 0 28px color-mix(in srgb, var(--marker-color, currentColor) 45%, transparent);
+          }
+          .zk-callout {
+            position: absolute;
+            left: 42px;
+            top: -6px;
+            min-width: 150px;
+            padding: 10px 12px;
+            border: 1px solid rgba(157, 185, 209, .22);
+            border-radius: 7px;
+            background: rgba(9, 16, 25, .88);
+            box-shadow: 0 16px 35px rgba(0,0,0,.28);
+            backdrop-filter: blur(10px);
+          }
+          .zk-marker:hover .zk-callout { border-color: var(--marker-color, currentColor); }
+          .zk-name { font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .03em; color: #eef8ff; }
+          .zk-meta { margin-top: 4px; font-size: 11px; color: var(--muted); white-space: nowrap; }
+          .zk-indexer { left: 23%; top: 39%; --marker-color: $indexer_color$; color: $indexer_color$; }
+          .zk-node { left: 20%; top: 51%; --marker-color: $node_color$; color: $node_color$; }
+          .zk-wallet { left: 44%; top: 56%; --marker-color: $wallet_color$; color: $wallet_color$; }
+          .zk-proof { left: 24%; top: 78%; --marker-color: $proof_color$; color: $proof_color$; }
+          .zk-indexer .zk-callout { left: 58px; top: -10px; }
+          .zk-node .zk-callout { left: 58px; top: -3px; }
+          .zk-wallet .zk-callout { left: 58px; top: -5px; }
+          .zk-proof .zk-callout { left: 58px; top: -3px; }
+          .zk-cluster {
+            position: absolute;
+            z-index: 4;
+            left: 79%;
+            top: 58%;
+            transform: translate(-50%, -50%);
+            width: 270px;
+            padding: 16px 18px;
+            border: 1px solid $cluster_color$;
+            border-radius: 9px;
+            background: rgba(9, 18, 27, .78);
+            box-shadow: 0 0 32px color-mix(in srgb, $cluster_color$ 20%, transparent), 0 18px 60px rgba(0,0,0,.34);
+            backdrop-filter: blur(10px);
+          }
+          .zk-cluster strong { display: block; font-size: 17px; margin-bottom: 6px; }
+          .zk-cluster span { color: var(--muted); font-size: 12px; }
+          .zk-launch {
+            position: absolute;
+            z-index: 4;
+            top: 22px;
+            right: 22px;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            padding: 11px 13px;
+            border-radius: 8px;
+            border: 1px solid rgba(149, 182, 210, .25);
+            background: rgba(9, 16, 25, .75);
+            font-weight: 800;
+          }
+          .zk-side {
+            grid-column: 2;
+            grid-row: 1 / 2;
+            border: 1px solid var(--line);
+            background: linear-gradient(180deg, rgba(13,25,38,.88), rgba(9,15,23,.92));
+            padding: 20px;
+            box-shadow: 0 24px 70px rgba(0,0,0,.26);
+          }
+          .zk-side h3 { margin: 0; font-size: 20px; }
+          .zk-side .subhead { margin: 5px 0 18px; color: var(--muted); font-size: 12px; }
+          .zk-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 12px 0;
+            border-top: 1px solid rgba(151, 178, 205, .14);
+            color: #dce8f1;
+            font-size: 13px;
+          }
+          .zk-row span:first-child { color: var(--muted); }
+          .zk-health { color: $cluster_color$; font-weight: 900; text-transform: uppercase; }
+          .zk-button {
+            display: block;
+            margin-top: 18px;
+            padding: 12px 14px;
+            border-radius: 7px;
+            text-align: center;
+            color: #07120a !important;
+            background: #7dbb55;
+            font-weight: 900;
+          }
+          .zk-boundary {
+            margin-top: 18px;
+            padding: 13px;
+            border: 1px solid rgba(151, 178, 205, .16);
+            color: var(--muted);
+            background: rgba(5, 11, 17, .42);
+            font-size: 12px;
+            line-height: 1.45;
+          }
+          .zk-kpis {
+            grid-column: 1 / 3;
+            grid-row: 2;
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+          }
+          .zk-kpi {
+            border: 1px solid var(--line);
+            background: rgba(11, 20, 30, .86);
+            padding: 16px 18px;
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+          }
+          .zk-kpi span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
+          .zk-kpi strong { display: block; margin-top: 7px; font-size: 30px; line-height: 1; letter-spacing: 0; }
+          .zk-kpi.ok strong { color: #83c95e; }
+          .zk-kpi.warn strong { color: #f2c24d; }
+          .zk-kpi.bad strong { color: #dc6659; }
+          @media (max-width: 1050px) {
+            .zk-home { min-height: 980px; }
+            .zk-stage { grid-template-columns: 1fr; grid-template-rows: 560px auto auto; }
+            .zk-side { grid-column: 1; grid-row: 2; }
+            .zk-kpis { grid-column: 1; grid-row: 3; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          }
+        </style>
+        <div class="zk-home">
+          <div class="zk-top">
+            <div class="zk-brand">ZK<span>Splunk</span></div>
+            <nav class="zk-tabs">
+              <a class="zk-tab active" href="/app/zksplunk/zksplunk_global_map">Global Map</a>
+              <a class="zk-tab" href="/app/zksplunk/zksplunk_component_detail">Component Detail</a>
+              <a class="zk-tab" href="/app/zksplunk/zksplunk_overview">Overview</a>
+              <a class="zk-tab" href="/app/zksplunk/zksplunk_mcp_analyst">MCP Analyst</a>
+              <a class="zk-tab" href="/app/zksplunk/zksplunk_ai_toolkit_analyst">AI Toolkit Analyst</a>
+            </nav>
+            <div class="zk-top-spacer"></div>
+            <a class="zk-pill" href="/app/zksplunk/zksplunk_operator_summary">1AM cluster: $cluster_status$</a>
+          </div>
+
+          <main class="zk-stage">
+            <section class="zk-map-panel">
+              <div class="zk-map-title">
+                <h2>1AM Midnight Node Operator</h2>
+                <p>Geographic topology for the monitored functional unit</p>
+              </div>
+              <a class="zk-launch" href="/app/zksplunk/zksplunk_overview">Open current monitoring</a>
+              <svg class="zk-routes" aria-hidden="true">
+                <line class="hot" x1="23%" y1="39%" x2="69%" y2="58%"/>
+                <line x1="20%" y1="51%" x2="69%" y2="58%"/>
+                <line x1="44%" y1="56%" x2="69%" y2="58%"/>
+                <line class="hot" x1="24%" y1="78%" x2="69%" y2="58%"/>
+              </svg>
+              <a class="zk-marker zk-indexer" href="/app/zksplunk/zksplunk_component_detail?form.component=indexer">
+                <div class="zk-pin">DB</div>
+                <div class="zk-callout"><div class="zk-name">Indexer</div><div class="zk-meta">$indexer_status$ - $indexer_latency$ ms</div></div>
+              </a>
+              <a class="zk-marker zk-node" href="/app/zksplunk/zksplunk_component_detail?form.component=node">
+                <div class="zk-pin">N</div>
+                <div class="zk-callout"><div class="zk-name">Midnight Node</div><div class="zk-meta">$node_status$ - $node_latency$ ms</div></div>
+              </a>
+              <a class="zk-marker zk-wallet" href="/app/zksplunk/zksplunk_component_detail?form.component=wallet">
+                <div class="zk-pin">W</div>
+                <div class="zk-callout"><div class="zk-name">Wallet Runner</div><div class="zk-meta">host TBD - $wallet_status$</div></div>
+              </a>
+              <a class="zk-marker zk-proof" href="/app/zksplunk/zksplunk_component_detail?form.component=proof-server">
+                <div class="zk-pin">ZK</div>
+                <div class="zk-callout"><div class="zk-name">Proof Server</div><div class="zk-meta">Argentina - $proof_status$</div></div>
+              </a>
+              <a class="zk-cluster" href="/app/zksplunk/zksplunk_operator_summary">
+                <strong>1AM Operator Cluster</strong>
+                <span>$cluster_components$ components - $cluster_warning$ warning - $cluster_critical$ critical</span>
+              </a>
+            </section>
+
+            <aside class="zk-side">
+              <h3>Selected cluster</h3>
+              <div class="subhead">1AM Midnight Node Operator</div>
+              <div class="zk-row"><span>Cluster health</span><strong class="zk-health">$cluster_status$</strong></div>
+              <div class="zk-row"><span>Components</span><strong>$cluster_components$</strong></div>
+              <div class="zk-row"><span>Warning</span><strong>$cluster_warning$</strong></div>
+              <div class="zk-row"><span>Critical</span><strong>$cluster_critical$</strong></div>
+              <div class="zk-row"><span>Last update</span><strong>$cluster_last_update$</strong></div>
+              <a class="zk-button" href="/app/zksplunk/zksplunk_operator_summary">View operator summary</a>
+              <div class="zk-boundary">ZKSplunk observes public infrastructure metadata only: node, indexer, wallet boundary, proof-server reachability, latency, and event flow.</div>
+            </aside>
+
+            <section class="zk-kpis">
+              <div class="zk-kpi ok"><div><span>Critical components</span><strong>$critical_count$</strong></div></div>
+              <div class="zk-kpi ok"><div><span>Proof p95</span><strong>$proof_p95$</strong></div></div>
+              <div class="zk-kpi warn"><div><span>Indexer p95</span><strong>$indexer_p95$</strong></div></div>
+              <div class="zk-kpi ok"><div><span>HEC failures</span><strong>$hec_failed$</strong></div></div>
+            </section>
+          </main>
+        </div>
+      </html>
+    </panel>
+  </row>
+</dashboard>

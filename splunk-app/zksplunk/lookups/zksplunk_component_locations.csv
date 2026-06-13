@@ -1,0 +1,5 @@
+operator_id,operator_label,component,component_type,location_label,lat,lon,notes
+1am,1AM Midnight Node Operator,indexer,indexer,USA - 1AM host TBD,39.8283,-98.5795,Exact 1AM indexer region should be confirmed
+1am,1AM Midnight Node Operator,node,midnight-node,USA - 1AM host TBD,38.9072,-77.0369,Exact 1AM node region should be confirmed
+1am,1AM Midnight Node Operator,wallet,wallet-runner,Wallet host TBD,40.7128,-74.0060,Wallet runner location depends on where 1AM operates it
+1am,1AM Midnight Node Operator,proof-server,proof-server,Buenos Aires Argentina,-34.6037,-58.3816,Current proof-server location assumption

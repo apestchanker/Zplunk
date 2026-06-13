@@ -1,0 +1,29 @@
+{
+  "name": "@zksplunk/demoland",
+  "version": "0.1.0",
+  "description": "ZKSplunk demoLand — simulated vitals + local sink + zkZap attack scenarios (no Docker, no Splunk Cloud, no chain)",
+  "author": "John Santi <bytewizard42i@github.com>",
+  "license": "Apache-2.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "demo": "tsx src/index.ts",
+    "demo:attacks": "tsx src/index.ts --attacks-only",
+    "dashboard": "tsx src/build-dashboard.ts",
+    "demo:dashboard": "tsx src/index.ts && tsx src/build-dashboard.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.22.0",
+    "typescript": "^5.4.0"
+  },
+  "keywords": [
+    "zksplunk",
+    "midnight",
+    "splunk",
+    "demoland",
+    "zkzap",
+    "observability"
+  ]
+}

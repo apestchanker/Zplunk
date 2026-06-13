@@ -1,0 +1,32 @@
+{
+  "name": "@zksplunk/contract",
+  "version": "0.1.0",
+  "description": "ZKSplunk on-chain observability attestation contract (Compact)",
+  "author": "John Santi <bytewizard42i@github.com>",
+  "license": "Apache-2.0",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "compile": "compact compile src/zksplunk.compact managed/zksplunk",
+    "build": "npm run compile && tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist managed",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@midnight-ntwrk/compact-runtime": "^0.16.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0",
+    "vitest": "^1.4.0"
+  },
+  "keywords": [
+    "midnight",
+    "compact",
+    "zksplunk",
+    "observability",
+    "attestation"
+  ]
+}
