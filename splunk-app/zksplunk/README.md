@@ -60,11 +60,11 @@ Sourcetypes parsed: `midnight:vitals`, `midnight:chain`, `midnight:contracts`,
 6. Open **ZKSplunk AI Toolkit Analyst** to ask questions inside Splunk. This
    view gathers live evidence from `index=zksplunk` and phrases the response
    with Splunk AI Toolkit's `| ai` command. The tested local connection is
-   `ZKSplunk2`, configured as `provider=Gemini` and
-   `model=gemini-3.5-flash`, so the view calls:
+   `ZKsplunk3`, configured as `provider=Gemini` and
+   `model=gemini-2.5-flash`, so the view calls:
 
    ```spl
-   | ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash
+   | ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash
    ```
 
    It requires AI Toolkit installed and a role with

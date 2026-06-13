@@ -322,7 +322,7 @@ function renderAiEvidence(view) {
   ], latest));
   const p2 = panel('Prompt shape used by the Splunk tab'); view.appendChild(p2);
   const pre = document.createElement('div'); pre.className = 'prompt';
-  pre.textContent = 'You are zkZap, the ZKSplunk analyst. Answer the operator question using only the live Splunk evidence below. Do not claim visibility into private Midnight state, witness values, shielded parties, or shielded amounts. Include classification, evidence, impact, and recommended action. Evidence: ' + evidence.join('; ') + '\\n\\n| ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash';
+  pre.textContent = 'You are zkZap, the ZKSplunk analyst. Answer the operator question using only the live Splunk evidence below. Do not claim visibility into private Midnight state, witness values, shielded parties, or shielded amounts. Include classification, evidence, impact, and recommended action. Evidence: ' + evidence.join('; ') + '\\n\\n| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash';
   p2.appendChild(pre);
 }
 

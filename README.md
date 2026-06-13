@@ -54,7 +54,7 @@ ZKSplunk is a working local Splunk Enterprise observability app plus connector/a
 |---|---|---|
 | Live Midnight component monitoring | **Running / implemented** | `zkMonitor` / `realDeal` probes proof-server, indexer, node, and wallet-facing public metadata, then forwards events to Splunk HEC. |
 | Splunk app dashboards | **Running / implemented** | `splunk-app/zksplunk` ships the `zksplunk` index, saved searches, alerts, component detail view, operator map, and packaged `.spl`. |
-| Splunk-native AI Toolkit analyst tab | **Running / implemented** | `splunk-app/zksplunk` ships **ZKSplunk AI Toolkit Analyst**, a Splunk tab that aggregates `index=zksplunk` evidence and calls Splunk AI Toolkit `| ai` directly. Tested with connection `ZKSplunk2`: `provider=Gemini`, `model=gemini-3.5-flash`. |
+| Splunk-native AI Toolkit analyst tab | **Running / implemented** | `splunk-app/zksplunk` ships **ZKSplunk AI Toolkit Analyst**, a Splunk tab that aggregates `index=zksplunk` evidence and calls Splunk AI Toolkit `| ai` directly. Tested with connection `ZKsplunk3`: `provider=Gemini`, `model=gemini-2.5-flash`. |
 | Local AI analyst chat | **Running / implemented** | `ai-agent` queries Splunk via MCP when configured, falls back to REST, and phrases evidence-backed answers through Splunk AI Toolkit `| ai`; external LLMs are fallback-only. |
 | Splunk MCP integration | **Implemented for Splunk evidence** | The local analyst can use Splunk MCP or Splunk REST to gather evidence. |
 | Dual MCP bridge: Splunk MCP + Midnight MCP | **Future / planned** | The cross-platform bridge described below is the target architecture: Splunk evidence plus Midnight MCP contract/docs/tooling context in one investigation loop. |
@@ -65,7 +65,7 @@ ZKSplunk is a working local Splunk Enterprise observability app plus connector/a
 
 ## Architecture
 
-Two implemented flows run through ZKSplunk today: a **telemetry ingestion** path (green) that streams Midnight infrastructure health into Splunk, and an **AI analyst** path (orange) where operators ask questions inside the Splunk app. The primary analyst surface is the **ZKSplunk AI Toolkit Analyst** tab, which runs SPL over `index=zksplunk` and invokes Splunk AI Toolkit with `| ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash`. The local `ai-agent` chat remains available for the MCP-backed flow and also prefers Splunk AI Toolkit for phrasing. The dual Splunk MCP + Midnight MCP bridge is shown as the planned extension point, not as a completed production bridge.
+Two implemented flows run through ZKSplunk today: a **telemetry ingestion** path (green) that streams Midnight infrastructure health into Splunk, and an **AI analyst** path (orange) where operators ask questions inside the Splunk app. The primary analyst surface is the **ZKSplunk AI Toolkit Analyst** tab, which runs SPL over `index=zksplunk` and invokes Splunk AI Toolkit with `| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash`. The local `ai-agent` chat remains available for the MCP-backed flow and also prefers Splunk AI Toolkit for phrasing. The dual Splunk MCP + Midnight MCP bridge is shown as the planned extension point, not as a completed production bridge.
 
 The full hackathon-required architecture diagram lives at [`architecture_diagram.md`](architecture_diagram.md). It shows the live Midnight telemetry path into Splunk HEC, the Splunk app surfaces, and the runtime AI analyst path through Splunk MCP Server.
 

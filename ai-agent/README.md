@@ -81,10 +81,10 @@ start the agent / fix Splunk connectivity — it never fabricates telemetry.
 For the hackathon path, set `SPLUNK_AI_TOOLKIT_ENABLED=true` after installing
 and configuring Splunk AI Toolkit. The analyst phrases answers through
 Splunk's `| ai` command, while evidence still comes from Splunk MCP/REST.
-The tested local configuration uses the AI Toolkit connection `ZKSplunk2`:
+The tested local configuration uses the AI Toolkit connection `ZKsplunk3`:
 
 ```spl
-| ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash
+| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash
 ```
 
 Set the same provider/model in `.env`:
@@ -92,7 +92,7 @@ Set the same provider/model in `.env`:
 ```env
 SPLUNK_AI_TOOLKIT_ENABLED=true
 SPLUNK_AI_TOOLKIT_PROVIDER=Gemini
-SPLUNK_AI_TOOLKIT_MODEL=gemini-3.5-flash
+SPLUNK_AI_TOOLKIT_MODEL=gemini-2.5-flash
 ```
 
 Leave provider/model blank only if the Splunk user has a working default AI

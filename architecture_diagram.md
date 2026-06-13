@@ -75,7 +75,7 @@ graph TD
 4. The primary operator path is the **ZKSplunk AI Toolkit Analyst** tab inside
    the Splunk app. It aggregates live `index=zksplunk` evidence with SPL and
    calls Splunk AI Toolkit directly with
-   `| ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash`.
+   `| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash`.
 5. The local `ai-agent` chat remains available at `localhost:8787`. It uses
    Splunk MCP Server at runtime to run SPL against live Splunk evidence. If MCP
    is not configured, it falls back to Splunk REST for evidence.

@@ -41,7 +41,7 @@
         <div class="zk-native-note">
           <strong>Native Splunk AI path.</strong>
           This tab gathers live ZKSplunk evidence with SPL, then calls Splunk AI Toolkit through <code>| ai</code>.
-          The tested connection is <code>ZKSplunk2</code>: <code>provider=Gemini</code>, <code>model=gemini-3.5-flash</code>.
+          The tested connection is <code>ZKsplunk3</code>: <code>provider=Gemini</code>, <code>model=gemini-2.5-flash</code>.
           The local demo configuration marks <code>| ai</code> as trusted for dashboards to avoid Splunk's risky-command confirmation gate.
           If the answer panel errors, install/configure Splunk AI Toolkit and grant the user <code>apply_ai_commander_command</code>.
         </div>
@@ -68,7 +68,7 @@ index=zksplunk earliest=$time_window.earliest$ latest=$time_window.latest$ (sour
 | stats values(signal) as evidence
 | eval question=$question|s$
 | eval prompt="You are zkZap, the ZKSplunk analyst. Answer the operator question using only the live Splunk evidence below. Do not claim visibility into private Midnight state, witness values, shielded parties, or shielded amounts. Include classification, evidence, impact, and recommended action. Question: " . question . " Evidence: " . mvjoin(evidence,"; ")
-| ai prompt="{prompt}" provider=Gemini model=gemini-3.5-flash
+| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash
 | eval answer=coalesce(ai_result,ai_result_1,response,answer,"Splunk AI Toolkit returned no answer. Check the AI Toolkit provider/model configuration and user permissions.")
 | table answer
           </query>
