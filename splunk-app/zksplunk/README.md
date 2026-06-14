@@ -11,7 +11,7 @@ default/indexes.conf                     the `zksplunk` index
 default/props.conf                       JSON parsing for all 4 sourcetypes
 default/savedsearches.conf               10 alert rules (one critical email rule enabled)
 default/data/ui/nav/default.xml          navigation
-default/data/ui/views/zksplunk_global_map.xml   the default geographic operator map
+default/data/ui/views/zksplunk_global_map.xml   the default geographic operator map plus KPI strip
 default/data/ui/views/zksplunk_overview.xml   the original overview dashboard
 default/data/ui/views/zksplunk_component_detail.xml   per-component drilldown
 default/data/ui/views/zksplunk_operator_summary.xml   1AM operator cluster summary
@@ -24,7 +24,18 @@ metadata/default.meta                    global read sharing
 ```
 
 Sourcetypes parsed: `midnight:vitals`, `midnight:chain`, `midnight:contracts`,
-`zksplunk:connector`, `zksplunk:relayer`.
+`zksplunk:connector`, `zksplunk:relayer`, `zksplunk:onchain`.
+
+## Package
+
+Build the installable `.spl` from the repository root with:
+
+```
+sh scripts/package-splunk-app.sh
+```
+
+Do not package the app with Finder or bare macOS `tar`; those can add
+`__MACOSX`, `.DS_Store`, or `._*` AppleDouble files that Splunk rejects.
 
 ## Install (local Splunk Enterprise)
 
@@ -56,6 +67,9 @@ Sourcetypes parsed: `midnight:vitals`, `midnight:chain`, `midnight:contracts`,
 5. Open **Apps -> ZKSplunk -> ZKSplunk Global Map**. Click a component marker
    (`indexer`, `proof-server`, `wallet`, `node`) to open its detail drilldown.
    Click the **1AM Operator Cluster** badge to open the operator summary.
+   The KPI strip under the map should show critical components, proof/indexer
+   p95 latency, HEC failures, Midnight contract deployment state, and on-chain
+   attestation count.
 
 6. Open **ZKSplunk AI Toolkit Analyst** to ask questions inside Splunk. This
    view gathers live evidence from `index=zksplunk` and phrases the response
@@ -98,6 +112,26 @@ The default page is a geographic operator map for the current MVP cluster:
 
 Edit `lookups/zksplunk_component_locations.csv` when 1AM confirms exact host
 regions. Health colors still come from live Splunk events in `index=zksplunk`.
+
+The KPI strip below the map is intentionally part of the main Global Map view.
+Its operational KPIs come from `midnight:vitals` and `zksplunk:connector`; its
+blockchain KPIs come from `zksplunk:onchain`, which is emitted by
+`zkMonitor/src/onchain-status-reader.ts`.
+
+## Midnight blockchain attestation
+
+The demo attestation runtime has three moving pieces:
+
+| Piece | Command | Emits |
+|---|---|---|
+| Deploy/register | `cd zkMonitor && npm run deploy` | contract address and first operator registration |
+| Relayer | `cd zkMonitor && npm run relayer` | `zksplunk:relayer` received/submitted/failed/heartbeat events |
+| On-chain reader | `cd zkMonitor && npm run onchain-status` | `zksplunk:onchain` deployment, operator, attestation, and public incident events |
+
+Open **zkZap Attestation** for the full pipeline view. Open **Global Map** for
+the compact operator view where the blockchain state appears alongside the
+health KPIs. Full setup is documented in
+`docs/BLOCKCHAIN_PIPELINE_SETUP.md`.
 
 ## Alert rules
 

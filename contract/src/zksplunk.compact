@@ -142,10 +142,15 @@ witness operatorPath(leaf: Bytes<32>): MerkleTreePath<16, Bytes<32>>;
 // Constructor
 // ---------------------------------------------------------------------------
 
-constructor(_networkId: Bytes<32>, _adminKeyHash: Bytes<32>, _schemaVersion: Field) {
+// _adminKeyHash is removed — the admin key hash and initial operator leaf are
+// computed from the witness inside the circuit so TypeScript never needs to
+// compute persistentHash.
+constructor(_networkId: Bytes<32>, _schemaVersion: Field) {
+  const sk = localSecretKey();
   networkId = disclose(_networkId);
-  adminPublicKeyHash = disclose(_adminKeyHash);
+  adminPublicKeyHash = disclose(callerKeyHashFromSecret(sk));
   observabilitySchemaVersion = disclose(_schemaVersion);
+  operators.insert(disclose(operatorLeaf(sk)));
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +163,10 @@ constructor(_networkId: Bytes<32>, _adminKeyHash: Bytes<32>, _schemaVersion: Fie
 // anonymous via Merkle membership).
 circuit callerKeyHash(): Bytes<32> {
   const sk = localSecretKey();
+  return callerKeyHashFromSecret(sk);
+}
+
+circuit callerKeyHashFromSecret(sk: Bytes<32>): Bytes<32> {
   return persistentHash<Vector<2, Bytes<32>>>([pad(32, "zksplunk:admin:pk:"), sk]);
 }
 
@@ -185,13 +194,19 @@ circuit assertAdmin(): [] {
 // Admin circuits — membership-set management
 // ---------------------------------------------------------------------------
 
-// Admin registers a new operator by inserting their commitment leaf into the
-// membership tree. The leaf is hidden by leaf_hash() on insertion; the operator
-// derives the SAME leaf locally from their secret key via operatorLeaf().
-//
+// Self-register: the deployer (admin) registers themselves as the first operator.
+// The operator leaf is computed from the witness secret key INSIDE the circuit,
+// so TypeScript never needs to compute persistentHash.
+export circuit selfRegisterAsOperator(): [] {
+  assertAdmin();
+  const sk = localSecretKey();
+  operators.insert(disclose(operatorLeaf(sk)));
+}
+
+// Register an external operator by inserting their pre-computed commitment leaf.
 //   operatorCommitment: persistentHash("zksplunk:op:commit:", operatorSecretKey)
-//                       computed off-chain by the operator and handed to the
-//                       admin out-of-band during onboarding.
+//                       computed by the operator (e.g. via the Compact simulator)
+//                       and provided to the admin out-of-band during onboarding.
 export circuit registerOperator(operatorCommitment: Bytes<32>): [] {
   assertAdmin();
   operators.insert(disclose(operatorCommitment));

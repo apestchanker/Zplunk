@@ -24,6 +24,125 @@
 
   <row>
     <panel>
+      <html>
+        <div style="padding:8px 12px; color:#d3dae3;">
+          <b style="color:#1182F3;">Deployment &amp; on-chain status</b> — read directly from the chain via the indexer (read-only, no wallet). If "Contract" shows NOT DEPLOYED, run <code>npm run deploy</code> and start <code>npm run onchain-status</code> in <code>zkMonitor/</code>.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Contract</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" earliest=-2h
+| sort 0 -_time | head 1 | eval state=if(deployed="true","DEPLOYED","NOT DEPLOYED") | table state</query>
+          <earliest>-2h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">none</option>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Operators registered</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" deployed="true" earliest=-2h
+| sort 0 -_time | head 1 | fields operators_registered</query>
+          <earliest>-2h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="rangeColors">["0x708794","0x53a051"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+    <panel>
+      <title>On-chain attestations</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" deployed="true" earliest=-2h
+| sort 0 -_time | head 1 | fields attestation_count</query>
+          <earliest>-2h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="rangeColors">["0x708794","0x53a051"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+    <panel>
+      <title>On-chain reader (s since read)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" | stats latest(_time) as last | eval secs=round(now()-last)</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="field">secs</option>
+        <option name="unit">s</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[120,300]</option>
+        <option name="colorBy">value</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Recent on-chain incidents (public class log)</title>
+      <table>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.incident"
+| dedup seq | sort -seq | table _time seq incident_class severity epoch</query>
+          <earliest>$tr.earliest$</earliest>
+          <latest>$tr.latest$</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="count">15</option>
+        <option name="drilldown">none</option>
+      </table>
+    </panel>
+    <panel>
+      <title>Nullifiers spent (anti-replay)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" deployed="true" earliest=-2h
+| sort 0 -_time | head 1 | fields nullifiers_spent</query>
+          <earliest>-2h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="drilldown">none</option>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <html>
+        <div style="padding:8px 12px; color:#9aa4b2;">
+          <b style="color:#65A637;">Relayer pipeline</b> (runtime): critical alarm → collector proves (no wallet) → relayer merges DUST fee + submits.
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
       <title>Critical incidents detected (collector)</title>
       <single>
         <search>

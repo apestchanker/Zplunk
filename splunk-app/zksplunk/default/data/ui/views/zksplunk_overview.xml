@@ -187,6 +187,98 @@
 
   <row>
     <panel>
+      <html>
+        <div style="padding:6px 12px; background:#111922; border-left:3px solid #5cc05c; color:#d3dae3;">
+          <b style="color:#5cc05c;">ZK Blockchain Attestation</b>
+          &#160;&#8212;&#160; Anonymous critical-incident anchoring on the Midnight network.
+          &#160;&#160;
+          <a href="/app/zksplunk/zksplunk_attestation" style="color:#5cc05c; font-weight:bold;">Ver dashboard completo &#8594;</a>
+        </div>
+      </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Contrato</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" deployed=* earliest=-5m
+| stats latest(deployed) as deployed
+| eval deployed=if(deployed="true","DEPLOYED","NOT DEPLOYED")</query>
+          <earliest>-5m</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[1]</option>
+        <option name="useColors">0</option>
+        <drilldown>
+          <link target="_blank">/app/zksplunk/zksplunk_attestation</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Operadores registrados</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" earliest=-5m
+| stats latest(operators_registered) as operators_registered</query>
+          <earliest>-5m</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="numberPrecision">0</option>
+        <drilldown>
+          <link target="_blank">/app/zksplunk/zksplunk_attestation</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Attestations on-chain</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" earliest=-5m
+| stats latest(attestation_count) as attestation_count</query>
+          <earliest>-5m</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="numberPrecision">0</option>
+        <drilldown>
+          <link target="_blank">/app/zksplunk/zksplunk_attestation</link>
+        </drilldown>
+      </single>
+    </panel>
+    <panel>
+      <title>Incidentes críticos (1h)</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.incident" earliest=-1h
+| stats count as incidents</query>
+          <earliest>-1h</earliest>
+          <latest>now</latest>
+          <refresh>60s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[0,3]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+        <drilldown>
+          <link target="_blank">/app/zksplunk/zksplunk_attestation</link>
+        </drilldown>
+      </single>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
       <title>Recent alertable conditions (last 15m)</title>
       <table>
         <search>

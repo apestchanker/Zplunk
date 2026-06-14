@@ -12,7 +12,8 @@
     "build": "npm run compile && tsc",
     "dev": "tsc --watch",
     "clean": "rm -rf dist managed",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node -e \"const{rmSync,symlinkSync,existsSync}=require('fs'),p=__dirname+'/node_modules/@midnight-ntwrk',t='../../../zkMonitor/node_modules/@midnight-ntwrk';['onchain-runtime-v3','compact-runtime'].forEach(m=>{const d=p+'/'+m;try{rmSync(d,{recursive:true,force:true})}catch(e){}symlinkSync(t+'/'+m,d)});\""
   },
   "dependencies": {
     "@midnight-ntwrk/compact-runtime": "^0.16.0"

@@ -10,7 +10,7 @@
 //     and proves Merkle membership + nullifier uniqueness without revealing
 //     which operator is attesting.
 //   - This relayer adds DUST fee inputs from the SYSTEM wallet, then calls
-//     wallet.balanceUnboundTransaction → finalizeRecipe → submitTransaction.
+//     wallet.balanceUnboundTransaction → normalized finalize → submitTransaction.
 //   - On-chain: public sees the SYSTEM wallet's dust address paid fees.
 //     The operator's Zswap coinPublicKey may appear in shielded output
 //     encryption, but is derived from OPERATOR_ZSWAP_SEED (a key that holds
@@ -63,6 +63,7 @@ import * as ledger from '@midnight-ntwrk/ledger-v8';
 
 import { loadConfigFromEnvironment } from '../../connector/src/config.ts';
 import { SplunkHecClient } from '../../connector/src/hec-client.ts';
+import { balanceAndFinalizeUnboundTransactionNormalized } from './normalized-transaction.ts';
 
 // ---------------------------------------------------------------------------
 // Load .env / .env.zkmonitor (reuse same loader as index.ts)
@@ -321,9 +322,9 @@ async function initRelayerWallet(): Promise<RelayerWallet> {
 //      authorizes spending the DUST. Merge constraint is satisfied because
 //      the balancing tx has no contract interactions.
 //
-//   3. wallet.finalizeRecipe(recipe) → FinalizedTransaction
-//      Internally merges the operator's proven tx with the relayer's
-//      balancing tx (Transaction.merge), then binds the combined tx.
+//   3. normalized finalize → FinalizedTransaction
+//      Merges fee first and operator contract call second. This avoids
+//      InvalidTransaction::Custom(117) / NotNormalized on preview nodes.
 //
 //   4. wallet.submitTransaction(finalTx) → txHash
 // ---------------------------------------------------------------------------
@@ -348,16 +349,12 @@ async function relayAttestation(
   // Step 2: Balance — relayer adds DUST fee inputs (no contract calls in
   // the balancing transaction, so Transaction.merge constraint is satisfied).
   const ttl = new Date(Date.now() + 30 * 60 * 1000); // 30 min from now
-  const recipe = await wallet.balanceUnboundTransaction(
+  const finalTx = await balanceAndFinalizeUnboundTransactionNormalized(
+    wallet,
     unboundTx as any,
     { shieldedSecretKeys, dustSecretKey },
     { ttl },
   );
-
-  // Step 3: Finalize (merge + bind). This atomically combines:
-  //   - Operator's proven tx (ZK proof of anonymous attestation)
-  //   - Relayer's balancing tx (DUST fee payment)
-  const finalTx = await wallet.finalizeRecipe(recipe);
 
   // Step 4: Submit to the Midnight network.
   const txId = await wallet.submitTransaction(finalTx);

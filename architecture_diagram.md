@@ -3,7 +3,7 @@
 This is the required hackathon architecture diagram file. It shows how ZKSplunk
 interacts with Splunk, how the Splunk-native AI Toolkit analyst is integrated,
 and how data flows between the Midnight infrastructure, ZKSplunk services,
-Splunk, and the operator-facing chat.
+Splunk, the AI analyst paths, and the demo on-chain attestation path.
 
 For VS Code Mermaid preview, open [`architecture_diagram.mmd`](architecture_diagram.mmd).
 This `.md` file is kept at the repository root because the hackathon rules
@@ -25,6 +25,7 @@ graph TD
   C1 --> C2[HEC client]
   C1 --> C3[Field extraction schema]
   C1 --> C4[Telemetry commitments]
+  C1 --> C5[Critical incident attestation trigger]
   C2 --> D1[Splunk HTTP Event Collector]
 
   D1 --> D2[index equals zksplunk]
@@ -33,6 +34,8 @@ graph TD
   D2 --> D5[Splunk REST API]
   D2 --> D6[Splunk MCP Server]
   D2 --> D7[Splunk AI Toolkit]
+  D4 --> D8[Global Map KPI strip]
+  D4 --> D9[zkZap Attestation dashboard]
 
   F1[Operator browser] --> E0[Splunk tab ZKSplunk AI Toolkit Analyst]
   E0 --> E6[SPL evidence aggregation]
@@ -57,10 +60,15 @@ graph TD
   E3 --> F2[Evidence backed answer]
   F2 --> F3[Recommended action]
 
-  C4 -. optional proof anchor .-> G1[zksplunk compact]
-  E3 -. optional critical incident .-> G1
-  G1 --> G2[Anonymous public incident class]
-  G1 --> G3[Tamper evident commitment]
+  C5 --> G0[Collector ZK proof client]
+  G0 --> G1[Attestation relayer funded system wallet]
+  G1 --> G2[Midnight zksplunk compact contract]
+  C4 -. telemetry commitment .-> G2
+  E3 -. critical incident recommendation .-> G0
+  G2 --> G3[Anonymous public incident class]
+  G2 --> G4[Tamper evident commitment]
+  G2 --> G5[Read-only on-chain status reader]
+  G5 --> D1
 ```
 
 ## Runtime Flow
@@ -71,7 +79,9 @@ graph TD
 2. The `connector` converts those observations into Splunk HEC events and sends
    them to `index=zksplunk`.
 3. The Splunk app provides dashboards, saved searches, and alert surfaces over
-   that live telemetry.
+   that live telemetry. The Global Map includes the KPI strip below the map:
+   critical components, proof/indexer p95 latency, HEC failures, Midnight
+   contract state, and on-chain attestation count.
 4. The primary operator path is the **ZKSplunk AI Toolkit Analyst** tab inside
    the Splunk app. It aggregates live `index=zksplunk` evidence with SPL and
    calls Splunk AI Toolkit directly with
@@ -82,6 +92,8 @@ graph TD
 6. Answer phrasing prefers Splunk AI Toolkit. External OpenAI-compatible LLMs
    are fallback-only and never supply facts. The live facts, health status,
    counts, and latency claims come from Splunk evidence.
-7. Optional on-chain attestation anchors only public incident classes and
-   telemetry commitments. Private Midnight state, witness values, shielded
-   parties, and shielded amounts are never observed.
+7. The demo on-chain attestation path deploys/registers `zksplunk.compact`,
+   relays critical-incident proofs through a funded system wallet, and runs a
+   read-only on-chain status reader that emits `zksplunk:onchain` events back
+   into Splunk. Private Midnight state, witness values, shielded parties, and
+   shielded amounts are never observed. The contract is not audited yet.

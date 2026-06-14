@@ -18,16 +18,15 @@
 //   5. Set ENABLE_ATTESTATION=true and restart the collector.
 //
 // What this does:
-//   - Deploys the zksplunk contract with initialState(networkId, adminKeyHash, 1n)
-//   - Registers this monitor's operator commitment via registerOperator()
+//   - Deploys the zksplunk contract with initialState(networkId, schemaVersion)
+//   - Registers the deployer/admin as the first operator inside the constructor
 //   - Prints the contract address
 // =============================================================================
 
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createHash } from 'node:crypto';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, filter } from 'rxjs';
 
 import WebSocket from 'ws';
 (globalThis as any).WebSocket = WebSocket;
@@ -56,6 +55,7 @@ import {
 } from '@midnight-ntwrk/wallet-sdk-unshielded-wallet';
 import { DustWallet } from '@midnight-ntwrk/wallet-sdk-dust-wallet';
 import { InMemoryTransactionHistoryStorage } from '@midnight-ntwrk/wallet-sdk-abstractions';
+import { ShieldedCoinPublicKey, ShieldedEncryptionPublicKey } from '@midnight-ntwrk/wallet-sdk-address-format';
 import * as ledger from '@midnight-ntwrk/ledger-v8';
 
 // ---- Contract ----
@@ -65,6 +65,7 @@ import {
   createZkSplunkPrivateState,
 } from '../../contract/src/witnesses.js';
 import type { ZkSplunkPrivateState } from '../../contract/src/witnesses.js';
+import { balanceAndFinalizeUnboundTransactionNormalized } from './normalized-transaction.ts';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MANAGED_CONTRACT_DIR = resolve(HERE, '../../contract/managed/zksplunk');
@@ -119,16 +120,6 @@ function bytesToHex(bytes: Uint8Array): string {
   return Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * Compute the operator leaf commitment.
- * The Compact circuit computes: persistentHash("zksplunk:op:commit:", secretKey).
- * We approximate with SHA-256 here so the admin can register the correct leaf.
- * Note: if the contract's persistentHash differs, update this accordingly.
- */
-function computeOperatorCommitment(secretKey: Uint8Array): Uint8Array {
-  const prefix = Buffer.from('zksplunk:op:commit:', 'utf8');
-  return new Uint8Array(createHash('sha256').update(prefix).update(secretKey).digest());
-}
 
 // ---------------------------------------------------------------------------
 // Main
@@ -143,7 +134,8 @@ async function main(): Promise<void> {
     .replace(/^https:\/\//, 'wss://')
     .replace(/\/health$/, '');
   const networkId = process.env.MIDNIGHT_NETWORK_ID ?? 'preview';
-  const rawSeed = process.env.MIDNIGHT_WALLET_SEED?.trim();
+  // Strip trailing non-hex chars (e.g. zsh "%" no-newline indicator)
+  const rawSeed = process.env.MIDNIGHT_WALLET_SEED?.trim().replace(/[^0-9a-fA-F]/g, '');
 
   console.log('=== ZKSplunk Deploy + RegisterOperator ===');
   console.log(`  networkId   : ${networkId}`);
@@ -209,29 +201,73 @@ async function main(): Promise<void> {
 
   await wallet.start(shieldedSecretKeys, dustSecretKey);
 
-  // Read unshielded address for funding instructions
-  const unshieldedState = await firstValueFrom(wallet.unshielded.state);
-  console.log(`\n  Wallet unshielded address (fund this):\n    ${unshieldedState.address}\n`);
+  // Print address using the keystore (already derived above, no network needed)
+  const walletAddress = unshieldedKeystore.getBech32Address().toString();
+  console.log(`\n  Wallet unshielded address (fund this):\n    ${walletAddress}\n`);
 
   console.log('Waiting for wallet sync...');
-  await wallet.waitForSyncedState();
+  const syncedState = await wallet.waitForSyncedState();
+
+  // Guard: must have funded NIGHT coins before we can do anything
+  const nightCoins = syncedState.unshielded.availableCoins;
+  if (nightCoins.length === 0) {
+    console.error(
+      '\nNo NIGHT coins found. Fund this address first:\n' +
+      `  ${walletAddress}\n\n` +
+      'Get NIGHT at: https://faucet.preview.midnight.network/\n' +
+      'Then wait ~2 minutes and run npm run deploy again.\n',
+    );
+    await wallet.stop();
+    process.exit(1);
+  }
+
+  // Register NIGHT UTXOs for DUST generation if not already done.
+  // This is required before any ZK transaction — DUST pays the fees.
+  // The registration tx itself does NOT need existing DUST to pay for it.
+  if (syncedState.dust.availableCoins.length === 0) {
+    console.log('\nNo DUST available. Registering NIGHT UTXOs for DUST generation...');
+    const { fee } = await wallet.estimateRegistration(nightCoins);
+    console.log(`  Estimated registration fee: ${fee} (DUST units)`);
+
+    const regRecipe = await wallet.registerNightUtxosForDustGeneration(
+      nightCoins,
+      unshieldedKeystore.getPublicKey(),
+      (payload) => unshieldedKeystore.signData(payload),
+    );
+    const regFinalized = await wallet.finalizeRecipe(regRecipe);
+    await wallet.submitTransaction(regFinalized);
+
+    console.log('  Registration tx submitted. Waiting for DUST coins to appear...');
+    await firstValueFrom(
+      wallet.state().pipe(
+        filter((s) => s.isSynced && s.dust.availableCoins.length > 0),
+      ),
+    );
+    console.log('  DUST coins received. Proceeding with deployment.\n');
+  }
 
   const shieldedState = await firstValueFrom(wallet.shielded.state);
-  const coinPublicKey = shieldedState.coinPublicKey;
-  const encryptionPublicKey = shieldedState.encryptionPublicKey;
+  // WalletProvider.getCoinPublicKey() must return a bech32 string.
+  // The SDK calls parseCoinPublicKeyToHex() on it internally — if given an object
+  // bech32.decode crashes with "string expected". Encode via the static codec.
+  const coinPublicKeyBech32 = ShieldedCoinPublicKey.codec.encode(networkId as any, shieldedState.coinPublicKey).toString();
+  const encPublicKeyBech32  = ShieldedEncryptionPublicKey.codec.encode(networkId as any, shieldedState.encryptionPublicKey).toString();
 
   // ---- Providers ----
   const walletProvider: WalletProvider = {
-    getCoinPublicKey: () => coinPublicKey as any,
-    getEncryptionPublicKey: () => encryptionPublicKey as any,
+    getCoinPublicKey: () => coinPublicKeyBech32 as any,
+    getEncryptionPublicKey: () => encPublicKeyBech32 as any,
     balanceTx: async (tx, ttl) => {
       const deadline = ttl ?? new Date(Date.now() + 30 * 60 * 1000);
-      const recipe = await wallet.balanceUnboundTransaction(
+      // `tx` is UnboundTransaction (proven, PreBinding).
+      // Circuit calls need fee first, then contract sections; otherwise the
+      // preview node rejects the transaction as Custom(117) / NotNormalized.
+      return balanceAndFinalizeUnboundTransactionNormalized(
+        wallet,
         tx,
         { shieldedSecretKeys, dustSecretKey },
         { ttl: deadline },
       );
-      return wallet.finalizeRecipe(recipe);
     },
   };
   const midnightProvider: MidnightProvider = {
@@ -244,7 +280,7 @@ async function main(): Promise<void> {
   const privateStateProvider = levelPrivateStateProvider<PSI, ZkSplunkPrivateState>({
     privateStateStoreName: 'zksplunk-private-state-deploy',
     signingKeyStoreName: 'zksplunk-signing-keys-deploy',
-    privateStoragePasswordProvider: () => rawSeed,
+    privateStoragePasswordProvider: () => 'Zk!' + rawSeed,
     accountId,
   });
 
@@ -258,16 +294,16 @@ async function main(): Promise<void> {
   } as unknown as MidnightProviders<ZkSplunkICK, PSI, ZkSplunkPrivateState>;
 
   // ---- Contract arguments ----
+  // The admin secret key is provided via the localSecretKey() witness — the
+  // constructor computes adminPublicKeyHash = persistentHash("zksplunk:admin:pk:", sk)
+  // inside the ZK circuit. TypeScript does NOT need to compute this hash.
   const operatorSecretKey = hexTo32Bytes(rawSeed);
   const networkIdBytes = new Uint8Array(32);
   const encoded = Buffer.from(networkId, 'utf8');
   networkIdBytes.set(encoded.slice(0, 32));
-
-  const adminKeyHash = computeOperatorCommitment(operatorSecretKey);
   const schemaVersion = 1n;
 
   console.log(`  networkId bytes : ${bytesToHex(networkIdBytes)}`);
-  console.log(`  adminKeyHash    : ${bytesToHex(adminKeyHash)}`);
   console.log(`  schemaVersion   : ${schemaVersion}`);
 
   // ---- Deploy ----
@@ -279,13 +315,12 @@ async function main(): Promise<void> {
     );
 
   const initialPrivateState = createZkSplunkPrivateState(operatorSecretKey);
-  await providers.privateStateProvider.set(PRIVATE_STATE_ID, initialPrivateState);
 
   const deployed = await deployContract(providers as any, {
     compiledContract: compiled as any,
     privateStateId: PRIVATE_STATE_ID,
     initialPrivateState,
-    args: [networkIdBytes, adminKeyHash, schemaVersion],
+    args: [networkIdBytes, schemaVersion],
   });
 
   const contractAddress = deployed.deployTxData.public.contractAddress;
@@ -294,11 +329,7 @@ async function main(): Promise<void> {
   console.log(`  Block     : ${deployed.deployTxData.public.blockHeight}`);
   console.log(`  TxHash    : ${deployed.deployTxData.public.txHash}`);
 
-  // ---- Register this monitor as an operator ----
-  const operatorCommitment = computeOperatorCommitment(operatorSecretKey);
-  console.log(`\nRegistering operator: ${bytesToHex(operatorCommitment)}`);
-  await deployed.callTx.registerOperator(operatorCommitment);
-  console.log('  Operator registered.\n');
+  console.log('  Initial operator registered in constructor.\n');
 
   // ---- Output ----
   console.log('=== Done — add to zkMonitor/.env ===\n');

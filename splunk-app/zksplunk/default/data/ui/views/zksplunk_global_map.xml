@@ -24,6 +24,9 @@
     <set token="proof_p95">-</set>
     <set token="indexer_p95">-</set>
     <set token="hec_failed">0</set>
+    <set token="contract_deployed">-</set>
+    <set token="attestation_count">-</set>
+    <set token="operators_count">-</set>
   </init>
 
   <search id="indexer_status">
@@ -118,6 +121,21 @@
       <set token="cluster_critical">$result.critical$</set>
       <set token="cluster_warning">$result.warning$</set>
       <set token="cluster_last_update">$result.last_update$</set>
+    </done>
+  </search>
+
+  <search id="blockchain_status">
+    <query>index=zksplunk sourcetype="zksplunk:onchain" type="zksplunk.onchain.status" earliest=-5m
+| stats latest(deployed) as deployed latest(attestation_count) as attestation_count latest(operators_registered) as operators_registered
+| eval deployed=if(deployed="true","DEPLOYED","not deployed")</query>
+    <earliest>-5m</earliest>
+    <latest>now</latest>
+    <refresh>60s</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <set token="contract_deployed">$result.deployed$</set>
+      <set token="attestation_count">$result.attestation_count$</set>
+      <set token="operators_count">$result.operators_registered$</set>
     </done>
   </search>
 
@@ -217,7 +235,7 @@
             inset: 70px 0 0;
             display: grid;
             grid-template-columns: minmax(720px, 1fr) 330px;
-            grid-template-rows: 1fr 122px;
+            grid-template-rows: 1fr;
             gap: 14px;
             padding: 18px;
           }
@@ -391,31 +409,10 @@
             font-size: 12px;
             line-height: 1.45;
           }
-          .zk-kpis {
-            grid-column: 1 / 3;
-            grid-row: 2;
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 14px;
-          }
-          .zk-kpi {
-            border: 1px solid var(--line);
-            background: rgba(11, 20, 30, .86);
-            padding: 16px 18px;
-            display: flex;
-            align-items: flex-end;
-            justify-content: space-between;
-          }
-          .zk-kpi span { display: block; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: uppercase; }
-          .zk-kpi strong { display: block; margin-top: 7px; font-size: 30px; line-height: 1; letter-spacing: 0; }
-          .zk-kpi.ok strong { color: #83c95e; }
-          .zk-kpi.warn strong { color: #f2c24d; }
-          .zk-kpi.bad strong { color: #dc6659; }
           @media (max-width: 1050px) {
-            .zk-home { min-height: 980px; }
-            .zk-stage { grid-template-columns: 1fr; grid-template-rows: 560px auto auto; }
+            .zk-home { min-height: 900px; }
+            .zk-stage { grid-template-columns: 1fr; grid-template-rows: 1fr auto; }
             .zk-side { grid-column: 1; grid-row: 2; }
-            .zk-kpis { grid-column: 1; grid-row: 3; grid-template-columns: repeat(2, minmax(0, 1fr)); }
           }
         </style>
         <div class="zk-home">
@@ -427,6 +424,7 @@
               <a class="zk-tab" href="/app/zksplunk/zksplunk_overview">Overview</a>
               <a class="zk-tab" href="/app/zksplunk/zksplunk_mcp_analyst">MCP Analyst</a>
               <a class="zk-tab" href="/app/zksplunk/zksplunk_ai_toolkit_analyst">AI Toolkit Analyst</a>
+              <a class="zk-tab" href="/app/zksplunk/zksplunk_attestation">ZK Attestation</a>
             </nav>
             <div class="zk-top-spacer"></div>
             <a class="zk-pill" href="/app/zksplunk/zksplunk_operator_summary">1AM cluster: $cluster_status$</a>
@@ -476,18 +474,99 @@
               <div class="zk-row"><span>Critical</span><strong>$cluster_critical$</strong></div>
               <div class="zk-row"><span>Last update</span><strong>$cluster_last_update$</strong></div>
               <a class="zk-button" href="/app/zksplunk/zksplunk_operator_summary">View operator summary</a>
+              <div class="zk-boundary" style="margin-top:12px; border-color:rgba(125,187,85,.28); padding:11px 13px;">
+                <div style="color:#84c65a; font-weight:900; font-size:12px; margin-bottom:6px; text-transform:uppercase; letter-spacing:.04em;">ZK Blockchain</div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px;"><span style="color:#90a1b4;">Contract</span><strong style="color:#edf5fb;">$contract_deployed$</strong></div>
+                <div style="display:flex; justify-content:space-between; margin-bottom:5px; font-size:12px;"><span style="color:#90a1b4;">Operadores</span><strong style="color:#edf5fb;">$operators_count$</strong></div>
+                <div style="display:flex; justify-content:space-between; font-size:12px;"><span style="color:#90a1b4;">Attestations</span><strong style="color:#edf5fb;">$attestation_count$</strong></div>
+              </div>
+              <a class="zk-button" href="/app/zksplunk/zksplunk_attestation" style="margin-top:10px; background:#1e4a2a;">Ver ZK Attestation &#8594;</a>
               <div class="zk-boundary">ZKSplunk observes public infrastructure metadata only: node, indexer, wallet boundary, proof-server reachability, latency, and event flow.</div>
             </aside>
 
-            <section class="zk-kpis">
-              <div class="zk-kpi ok"><div><span>Critical components</span><strong>$critical_count$</strong></div></div>
-              <div class="zk-kpi ok"><div><span>Proof p95</span><strong>$proof_p95$</strong></div></div>
-              <div class="zk-kpi warn"><div><span>Indexer p95</span><strong>$indexer_p95$</strong></div></div>
-              <div class="zk-kpi ok"><div><span>HEC failures</span><strong>$hec_failed$</strong></div></div>
-            </section>
           </main>
         </div>
       </html>
+    </panel>
+  </row>
+
+  <row>
+    <panel>
+      <title>Critical Components</title>
+      <single>
+        <search>
+          <query>index=zksplunk (sourcetype="midnight:vitals" OR sourcetype="zksplunk:connector" OR sourcetype="midnight:contracts") earliest=-15m
+| stats latest(status) as status by component
+| where status="critical" OR status="error"
+| stats count as critical</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Proof P95</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" component="proof-server" response_time_ms=* earliest=-15m
+| stats perc95(response_time_ms) as p95</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="unit">ms</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1000,2000]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>Indexer P95</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="midnight:vitals" component="indexer" response_time_ms=* earliest=-15m
+| stats perc95(response_time_ms) as p95</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>30s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="unit">ms</option>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xf8be34","0xdc4e41"]</option>
+        <option name="rangeValues">[1000,2000]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
+    </panel>
+    <panel>
+      <title>HEC Failures</title>
+      <single>
+        <search>
+          <query>index=zksplunk sourcetype="zksplunk:connector" type="zksplunk.connector.status" earliest=-15m
+| stats max(failed_events_since_last_heartbeat) as failed
+| eval failed=coalesce(failed,0)</query>
+          <earliest>-15m</earliest>
+          <latest>now</latest>
+          <refresh>20s</refresh>
+          <refreshType>delay</refreshType>
+        </search>
+        <option name="colorMode">block</option>
+        <option name="rangeColors">["0x53a051","0xdc4e41"]</option>
+        <option name="rangeValues">[0]</option>
+        <option name="useColors">1</option>
+        <option name="numberPrecision">0</option>
+      </single>
     </panel>
   </row>
 </dashboard>

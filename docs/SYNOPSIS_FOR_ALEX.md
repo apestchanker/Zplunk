@@ -11,10 +11,10 @@
 **ZKSplunk is the first observability bridge between a zero-knowledge blockchain
 (Midnight) and Splunk.** It streams telemetry about Midnight's ZK-proof
 infrastructure (proof server, indexer, wallet, contracts) into Splunk, where
-dashboards and an AI agent turn it into monitoring and autonomous incident
-response. **zkZap** is the security layer on top: it re-reads that telemetry as
-threat signals (proof floods, brute-force bursts, mint anomalies, wallet drains)
-and responds.
+dashboards and AI analyst tabs turn it into monitoring and operator guidance.
+**zkZap** is the security layer on top: it re-reads that telemetry as threat
+signals (proof floods, brute-force bursts, mint anomalies, wallet drains) and
+can anchor critical demo incidents as anonymous Midnight attestations.
 
 > Tagline: *ZKSplunk observes; zkZap responds.*
 
@@ -42,21 +42,22 @@ We never claim to monitor private state. That honesty is part of the pitch.
 ## 3. The architecture (where Midnight meets Splunk)
 
 ```
-   Midnight local-dev                ZKSplunk connector            Splunk
+   Midnight preview/local            ZKSplunk connector            Splunk
    ┌────────────────────┐      ┌──────────────────────┐     ┌──────────────────┐
-   │ node      :9944     │      │ vitals-adapter        │     │ HEC ingest        │
-   │ indexer   :8088     │ ───► │ hec-client (batch)    │ ──► │ index=zksplunk    │
-   │ proof     :6300     │ poll │ blockfrost-provider   │ HEC │ SPL + dashboards  │
+   │ node / RPC          │      │ vitals-adapter        │     │ HEC ingest        │
+   │ indexer GraphQL     │ ───► │ hec-client (batch)    │ ──► │ index=zksplunk    │
+   │ proof server :6300  │ poll │ on-chain status read  │ HEC │ SPL + dashboards  │
    └────────────────────┘      │ attestation-client    │     │ AI agent (MCP)    │
-                               └──────────┬───────────┘     └────────┬─────────┘
-                                          │                          │
-                                          ▼            on-chain incident commitment
-                                  zksplunk.compact ◄────────────────┘
+                               └──────────┬───────────┘     │ AI Toolkit tab   │
+                                          │                 │ MCP fallback tab  │
+                                          ▼                 └────────┬─────────┘
+                             relayer + zksplunk.compact ────────────┘
 ```
 
-Two data paths into Splunk:
+Three data paths into Splunk:
 1. **Vitals** — live HTTP health checks against proof server / indexer / wallet / contracts.
 2. **Public chain data** — block / contract-action / mint / spend events via the indexer (and Blockfrost for hosted).
+3. **On-chain attestation status** — `zksplunk:onchain` events from the read-only status reader, plus `zksplunk:relayer` events from the funded relayer.
 
 ---
 
@@ -72,7 +73,8 @@ Two data paths into Splunk:
 | `contract/src/zksplunk.compact` | ✅ | Sealed-ledger Compact contract: monitor registry, attestations, incident lifecycle |
 | `blockfrost-provider/` | ✅ | Public-chain data feed (block/contract-action/mint/spend) over GraphQL + WS |
 | `demoLand/` | ✅ | Offline simulated runner + zkZap attack scenarios + an HTML metrics dashboard |
-| `zkMonitor/` | ⚠️ partial | Live vitals → real HEC wiring (needs a live Splunk + Midnight to finish) |
+| `zkMonitor/` | ✅ demo runtime | Live vitals → real HEC wiring, deploy/register helper, relayer, and read-only on-chain status reader |
+| `splunk-app/zksplunk` | ✅ | Global Map with KPI strip, Overview, MCP Analyst, AI Toolkit Analyst, and zkZap Attestation dashboards |
 
 ---
 
@@ -80,11 +82,12 @@ Two data paths into Splunk:
 
 This is the highest-value remaining work. Pick whatever fits your strengths:
 
-### A. Stand up the live local pipeline (the #1 unbuilt thing)
-- Run **`midnightntwrk/midnight-local-dev`** (`git clone && npm install && npm start`) — spins up node :9944, indexer :8088, proof server :6300, with a funded master wallet.
-- Stand up a local Splunk (or Splunk Cloud trial), create the `zksplunk` index + a HEC token.
-- Point `zkMonitor/.env` at both, run the connector, and confirm events land in Splunk.
-- **Heads-up (already handled in config):** the Midnight indexer and Splunk HEC both default to **:8088**. We moved the local Splunk HEC to **:8090** to avoid the clash. See `docs/SPLUNK_API_INTEGRATION.md`.
+### A. Stand up or refresh the live pipeline
+- Stand up Splunk, create/use the `zksplunk` index, and configure a HEC token.
+- Point `zkMonitor/.env` at Splunk plus the Midnight preview network endpoints.
+- Run `npm run start` for vitals, `npm run relayer` for critical attestation submission, and `npm run onchain-status` for the read-only contract status feed.
+- Confirm the Global Map KPI strip and zkZap Attestation dashboard populate from `midnight:vitals`, `zksplunk:connector`, `zksplunk:relayer`, and `zksplunk:onchain`.
+- Local-dev note: the Midnight indexer and Splunk HEC both default to **:8088**. We moved local Splunk HEC to **:8090** to avoid the clash. See `docs/SPLUNK_API_INTEGRATION.md`.
 
 ### B. `connector/src/attack-signals.ts` (the detection brain — not built yet)
 - A rolling-window enrichment that turns raw public `Effects` (failed calls, mint rates, unshielded spends) into `attack_signal` fields for SPL.

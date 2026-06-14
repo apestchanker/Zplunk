@@ -12,6 +12,7 @@ graph TD
   C1 --> C2[HEC client]
   C1 --> C3[Field extraction schema]
   C1 --> C4[Telemetry commitments]
+  C1 --> C5[Critical incident attestation trigger]
   C2 --> D1[Splunk HTTP Event Collector]
 
   D1 --> D2[index equals zksplunk]
@@ -20,6 +21,8 @@ graph TD
   D2 --> D5[Splunk REST API]
   D2 --> D6[Splunk MCP Server]
   D2 --> D7[Splunk AI Toolkit]
+  D4 --> D8[Global Map KPI strip]
+  D4 --> D9[zkZap Attestation dashboard]
 
   F1[Operator browser] --> E0[Splunk tab ZKSplunk AI Toolkit Analyst]
   E0 --> E6[SPL evidence aggregation]
@@ -43,7 +46,12 @@ graph TD
   E3 --> F2[Evidence backed answer]
   F2 --> F3[Recommended action]
 
-  C4 -. optional proof anchor .-> G1[zksplunk compact]
-  E3 -. optional critical incident .-> G1
-  G1 --> G2[Anonymous public incident class]
-  G1 --> G3[Tamper evident commitment]
+  C5 --> G0[Collector ZK proof client]
+  G0 --> G1[Attestation relayer funded system wallet]
+  G1 --> G2[Midnight zksplunk compact contract]
+  C4 -. telemetry commitment .-> G2
+  E3 -. critical incident recommendation .-> G0
+  G2 --> G3[Anonymous public incident class]
+  G2 --> G4[Tamper evident commitment]
+  G2 --> G5[Read-only on-chain status reader]
+  G5 --> D1

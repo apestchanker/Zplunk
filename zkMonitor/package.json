@@ -8,8 +8,11 @@
   "private": true,
   "scripts": {
     "start": "tsx src/index.ts",
+    "gen-seed": "node -e \"process.stdout.write(require('node:crypto').randomBytes(32).toString('hex') + '\\n')\"",
+    "get-address": "tsx src/get-address.ts",
     "deploy": "tsx src/deploy-attestation.ts",
     "relayer": "tsx src/attestation-relayer.ts",
+    "onchain-status": "tsx src/onchain-status-reader.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"

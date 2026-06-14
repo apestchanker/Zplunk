@@ -53,19 +53,19 @@ ZKSplunk is a working local Splunk Enterprise observability app plus connector/a
 | Area | Status | Notes |
 |---|---|---|
 | Live Midnight component monitoring | **Running / implemented** | `zkMonitor` / `realDeal` probes proof-server, indexer, node, and wallet-facing public metadata, then forwards events to Splunk HEC. |
-| Splunk app dashboards | **Running / implemented** | `splunk-app/zksplunk` ships the `zksplunk` index, saved searches, alerts, component detail view, operator map, and packaged `.spl`. |
+| Splunk app dashboards | **Running / implemented** | `splunk-app/zksplunk` ships the `zksplunk` index, saved searches, alerts, component detail view, operator map, AI tabs, attestation view, and packaged `.spl`. The Global Map includes the KPI strip below the map: critical components, proof/indexer p95, HEC failures, contract state, and on-chain attestation count. |
 | Splunk-native AI Toolkit analyst tab | **Running / implemented** | `splunk-app/zksplunk` ships **ZKSplunk AI Toolkit Analyst**, a Splunk tab that aggregates `index=zksplunk` evidence and calls Splunk AI Toolkit `| ai` directly. Tested with connection `ZKsplunk3`: `provider=Gemini`, `model=gemini-2.5-flash`. |
 | Local AI analyst chat | **Running / implemented** | `ai-agent` queries Splunk via MCP when configured, falls back to REST, and phrases evidence-backed answers through Splunk AI Toolkit `| ai`; external LLMs are fallback-only. |
 | Splunk MCP integration | **Implemented for Splunk evidence** | The local analyst can use Splunk MCP or Splunk REST to gather evidence. |
 | Dual MCP bridge: Splunk MCP + Midnight MCP | **Future / planned** | The cross-platform bridge described below is the target architecture: Splunk evidence plus Midnight MCP contract/docs/tooling context in one investigation loop. |
-| On-chain attestation | **Partially complete** | `contract/src/zksplunk.compact` and commitment code exist, but the contract is not audited yet and the live production attestation flow is not treated as complete. |
+| On-chain attestation | **Demo runtime implemented / unaudited** | `contract/src/zksplunk.compact`, `zkMonitor` deploy tooling, the attestation relayer, and the read-only on-chain status reader are wired for the demo pipeline. The contract is not audited, so this is not treated as a production attestation system. Setup: [`docs/BLOCKCHAIN_PIPELINE_SETUP.md`](docs/BLOCKCHAIN_PIPELINE_SETUP.md). |
 | zkZap automated response / SOAR | **Future / planned** | Detection concepts and alert surfaces exist; automated SOAR/on-chain response remains future work. |
 
 ---
 
 ## Architecture
 
-Two implemented flows run through ZKSplunk today: a **telemetry ingestion** path (green) that streams Midnight infrastructure health into Splunk, and an **AI analyst** path (orange) where operators ask questions inside the Splunk app. The primary analyst surface is the **ZKSplunk AI Toolkit Analyst** tab, which runs SPL over `index=zksplunk` and invokes Splunk AI Toolkit with `| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash`. The local `ai-agent` chat remains available for the MCP-backed flow and also prefers Splunk AI Toolkit for phrasing. The dual Splunk MCP + Midnight MCP bridge is shown as the planned extension point, not as a completed production bridge.
+Three implemented demo flows run through ZKSplunk today: a **telemetry ingestion** path (green) that streams Midnight infrastructure health into Splunk, an **AI analyst** path (orange) where operators ask questions inside the Splunk app, and an **on-chain status/attestation** path (purple) that surfaces the deployed Midnight contract, operator count, attestation count, relayer health, and public incident classes in Splunk. The primary analyst surface is the **ZKSplunk AI Toolkit Analyst** tab, which runs SPL over `index=zksplunk` and invokes Splunk AI Toolkit with `| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash`. The local `ai-agent` chat remains available for the MCP-backed flow and also prefers Splunk AI Toolkit for phrasing. The dual Splunk MCP + Midnight MCP bridge is shown as the planned extension point, not as a completed production bridge.
 
 The full hackathon-required architecture diagram lives at [`architecture_diagram.md`](architecture_diagram.md). It shows the live Midnight telemetry path into Splunk HEC, the Splunk app surfaces, and the runtime AI analyst path through Splunk MCP Server.
 
@@ -83,6 +83,12 @@ graph TD
   D2 --> D4[Splunk MCP Server]
   D2 --> D5[Splunk REST fallback]
   D2 --> D6[Splunk AI Toolkit]
+  B1 --> G1[Attestation trigger on critical vitals]
+  G1 --> G2[ZK proof client]
+  G2 --> G3[Attestation relayer]
+  G3 --> G4[Midnight zksplunk compact contract]
+  G4 --> G5[Read-only on-chain status reader]
+  G5 --> D1
   F1[Operator] --> E0[Splunk AI Toolkit Analyst tab]
   E0 --> E6[SPL evidence aggregation]
   E6 --> D2
@@ -109,7 +115,9 @@ graph TD
 | Storage + UI | `splunk-app/zksplunk/` | `index=zksplunk`, dashboards, alerts, saved searches |
 | Splunk-native analyst | `splunk-app/zksplunk/default/data/ui/views/zksplunk_ai_toolkit_analyst.xml` | Splunk tab that asks questions over `index=zksplunk` and calls Splunk AI Toolkit `| ai` directly |
 | AI agent | `ai-agent/` | zkZap analyst chat — queries Splunk via MCP/REST and prefers Splunk AI Toolkit for answer phrasing |
-| On-chain | `contract/` | Compact contract for anonymous, unlinkable critical-incident attestation; **partial**, not audited yet |
+| On-chain contract | `contract/` | Compact contract for anonymous, unlinkable critical-incident attestation; demo-wired, **not audited yet** |
+| On-chain runtime | `zkMonitor/src/deploy-attestation.ts`, `zkMonitor/src/attestation-relayer.ts`, `zkMonitor/src/onchain-status-reader.ts` | deploy/register, relay critical-incident proofs, and emit `zksplunk:onchain` status/incidents back into Splunk |
+| Splunk attestation UI | `splunk-app/zksplunk/default/data/ui/views/zksplunk_attestation.xml` | contract deployment state, operators, on-chain attestation count, relayer liveness, public incident classes |
 
 > A simulated, offline twin of the collector lives in `demoLand/` — same `connector`/`vitals` code, mock source and local sink. See [`docs/DEMOLAND_VS_ZKMONITOR.md`](docs/DEMOLAND_VS_ZKMONITOR.md).
 
@@ -141,7 +149,7 @@ Two lenses over **one** pipeline:
 | Catches | Local brute-force, wallet drain, proof abuse | Systemic floods, mint storms, outages |
 | Privacy | Never reads private state | Built from public data — nobody shares secrets |
 
-Target flow: operators emit **anonymous, unlinkable critical-incident attestations** — only the anonymized incident *class* is published on-chain (the operator and node never are), proven via zero-knowledge **set-membership + a nullifier**. The Compact contract and commitment code are present, but this attestation path is **partially complete and unaudited**. The Macro aggregation view remains future work. (See [`docs/ZKZAP_SECURITY_PROTOCOL.md`](docs/ZKZAP_SECURITY_PROTOCOL.md) §3.3.)
+Current demo flow: operators can emit **anonymous, unlinkable critical-incident attestations** through the collector → relayer → Midnight contract path. Only the anonymized incident *class*, severity, epoch, payload commitment, and nullifier are public; the operator and node are not published. The read-only on-chain status reader sends `zksplunk:onchain` events back to Splunk so the Overview, Global Map, and zkZap Attestation dashboards can show deployment state, operator count, and attestation count. The contract remains **unaudited** and the Macro aggregation view remains future work. (See [`docs/ZKZAP_SECURITY_PROTOCOL.md`](docs/ZKZAP_SECURITY_PROTOCOL.md) §3.3 and [`docs/BLOCKCHAIN_PIPELINE_SETUP.md`](docs/BLOCKCHAIN_PIPELINE_SETUP.md).)
 
 ---
 
@@ -197,7 +205,7 @@ Midnight is a privacy chain, so the governing rule is simple: **metadata and vol
 | Track | Prize | Our Edge |
 |---|---|---|
 | **🏆 Grand Prize** | **$7,000** + .conf26 | An entirely **new observability domain** (ZK-proof infrastructure) + production-grade code + a privacy-native security layer (zkZap). |
-| **🥇 Best of Observability** | **$3,000** + .conf26 | **Home turf.** First Splunk connector for ZK infra — purpose-built field extraction, saved searches, dashboards, alerts, and a partial tamper-evident attestation layer. |
+| **🥇 Best of Observability** | **$3,000** + .conf26 | **Home turf.** First Splunk connector for ZK infra — purpose-built field extraction, saved searches, dashboards, alerts, and a demo-wired, unaudited tamper-evident attestation layer. |
 | **Best Use of Splunk MCP Server** | **$1,000** | Current: Splunk MCP-backed analyst over ZKSplunk evidence. Future: **Splunk MCP + Midnight MCP** bridge for cross-platform diagnostics neither server could do alone. |
 | **Most Valuable Feedback** | $200 ×5 | Thoughtful, actionable feedback during the feedback period. |
 
@@ -235,7 +243,7 @@ Midnight is a privacy chain, so the governing rule is simple: **metadata and vol
 
 ## On-Chain Schema — `contract/src/zksplunk.compact`
 
-Status: **partially complete, not audited yet**. The contract and commitment code define the intended tamper-evident anchoring layer, but this is not yet a production-audited attestation system.
+Status: **demo runtime implemented, not audited yet**. The contract, deploy/register script, relayer, and on-chain status reader define the tamper-evident anchoring path used by the Splunk dashboards, but this is not yet a production-audited attestation system.
 
 Design intent: telemetry lives off-chain (Splunk); only **commitments** and incident state go on-chain. Built on the Brick-Towers sealed-ledger + `persistentHash`-derived public-key patterns (`pragma language_version >= 0.16 && <= 0.23`).
 
@@ -354,11 +362,12 @@ Every vital check, log entry, and diagnostic report flows to Splunk automaticall
 This isn't a pitch deck — it's working, type-checked code.
 
 - **`connector/`** — production HEC client (batch + exponential retry + heartbeat), `SplunkForwarder` lifecycle, type-safe `vitals-adapter`, canonical `telemetry-commitment`, `attestation-client`, **14** field extractions + **11** SPL saved searches.
-- **`contract/`** — `zksplunk.compact` (sealed ledger + `persistentHash` keys; lifecycle circuits; `Severity` / `IncidentStatus` enums). The contract is present but **not audited yet**; live production attestation remains partial.
+- **`contract/`** — `zksplunk.compact` (sealed ledger + `persistentHash` keys; lifecycle circuits; `Severity` / `IncidentStatus` enums). The contract is demo-wired but **not audited yet**.
 - **`vitals/`** — full MidnightVitals module (mock + live provider interface, UI components).
 - **`demoLand/` + `zkMonitor/`** — offline simulated runner with **zkZap attack scenarios** + a tabbed metrics dashboard, and live HTTP→HEC wiring.
 - **`splunk-app/zksplunk/`** — installable Splunk app with global operator map, component detail dashboard, overview dashboard, saved searches, alert configuration, and packaged `.spl`.
 - **`ai-agent/`** — local analyst chat over Splunk evidence using Splunk MCP when configured, REST fallback otherwise, and Splunk AI Toolkit `| ai` phrasing when enabled.
+- **`zkMonitor/src/onchain-status-reader.ts`** — read-only Midnight indexer poller that emits `zksplunk:onchain` status and public incident events into Splunk.
 
 ## Future / Planned
 
