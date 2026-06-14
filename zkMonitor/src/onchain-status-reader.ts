@@ -104,7 +104,7 @@ function emitEvent(eventName: string, data: Record<string, unknown>): void {
     sourcetype: ONCHAIN_SOURCETYPE,
     source: ONCHAIN_SOURCE,
     index: hecConfig.splunkIndex,
-    event: { event: eventName, ...data },
+    event: { type: eventName, event: eventName, ...data },
   };
 
   if (hec) {

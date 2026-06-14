@@ -69,6 +69,7 @@ import { HDWallet, Roles } from '@midnight-ntwrk/wallet-sdk-hd';
 import { ShieldedWallet } from '@midnight-ntwrk/wallet-sdk-shielded';
 import { WalletFacade, WalletEntrySchema } from '@midnight-ntwrk/wallet-sdk-facade';
 import type { DefaultConfiguration } from '@midnight-ntwrk/wallet-sdk-facade';
+import { ShieldedCoinPublicKey, ShieldedEncryptionPublicKey } from '@midnight-ntwrk/wallet-sdk-address-format';
 import {
   UnshieldedWallet,
   createKeystore,
@@ -222,17 +223,19 @@ async function deriveOperatorZswapKeys(
   // Read coinPublicKey / encryptionPublicKey once and cache them synchronously.
   // These values are stable (derived from seed) and do not change.
   const shieldedState = await firstValueFrom(wallet.shielded.state);
-  const coinPublicKey = shieldedState.coinPublicKey;
-  const encryptionPublicKey = shieldedState.encryptionPublicKey;
+  const coinPublicKey = ShieldedCoinPublicKey.codec
+    .encode(walletConfig.networkId as any, shieldedState.coinPublicKey)
+    .toString();
+  const encryptionPublicKey = ShieldedEncryptionPublicKey.codec
+    .encode(walletConfig.networkId as any, shieldedState.encryptionPublicKey)
+    .toString();
 
   // Minimal WalletProvider: only getCoinPublicKey + getEncryptionPublicKey are
   // ever called by createUnprovenCallTx. balanceTx must NOT be called by this
   // module — balancing is the relayer's responsibility.
   const walletProvider: WalletProvider = {
-    getCoinPublicKey: () =>
-      coinPublicKey as unknown as ReturnType<WalletProvider['getCoinPublicKey']>,
-    getEncryptionPublicKey: () =>
-      encryptionPublicKey as unknown as ReturnType<WalletProvider['getEncryptionPublicKey']>,
+    getCoinPublicKey: () => coinPublicKey as any,
+    getEncryptionPublicKey: () => encryptionPublicKey as any,
     balanceTx: (_tx, _ttl) => {
       // Should never be called on the operator side.
       return Promise.reject(
@@ -295,7 +298,7 @@ export class MidnightJsAttestationClient implements AttestationClient {
       .replace(/^http:\/\//, 'ws://')
       .replace(/^https:\/\//, 'wss://')
       .replace(/\/health$/, '');
-    this.operatorZswapSeed = process.env.OPERATOR_ZSWAP_SEED?.trim() || null;
+    this.operatorZswapSeed = process.env.OPERATOR_ZSWAP_SEED?.trim().replace(/[^0-9a-fA-F]/g, '') || null;
     this.relayerUrl = process.env.ATTESTATION_RELAYER_URL?.trim().replace(/\/+$/, '') || null;
     this.contractAddress = process.env.ZKSPLUNK_CONTRACT_ADDRESS?.trim() || null;
     this.networkId = process.env.MIDNIGHT_NETWORK_ID ?? 'preview';
@@ -364,11 +367,12 @@ export class MidnightJsAttestationClient implements AttestationClient {
     // Use the first 32 chars of the seed hex as a stable, non-secret ID.
     const accountId = this.operatorZswapSeed.slice(0, 32);
     const privateStateProvider = levelPrivateStateProvider<PSI, ZkSplunkPrivateState>({
-      privateStateStoreName: 'zksplunk-private-state',
-      signingKeyStoreName: 'zksplunk-signing-keys',
-      privateStoragePasswordProvider: () => this.operatorZswapSeed!,
+      privateStateStoreName: 'zksplunk-private-state-v2',
+      signingKeyStoreName: 'zksplunk-signing-keys-v2',
+      privateStoragePasswordProvider: () => `Zk!${this.operatorZswapSeed!}`,
       accountId,
     });
+    privateStateProvider.setContractAddress(this.contractAddress!);
 
     const { walletProvider, stop } = await deriveOperatorZswapKeys(
       this.operatorZswapSeed,

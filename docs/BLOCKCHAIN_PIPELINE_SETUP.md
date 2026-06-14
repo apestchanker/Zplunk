@@ -79,12 +79,12 @@ Never commit them — `.env` is git-ignored.
 
 ## Step 2 — Get the wallet addresses
 
-Add the admin seed to `.env`, then run the address helper.
-It prints the bech32 address immediately — no network, no sync, exits cleanly.
+Add the admin and relayer seeds to `.env`. The admin address helper prints the
+bech32 address immediately — no network, no sync, exits cleanly.
 
 ```bash
-# Add admin seed to .env
 echo "MIDNIGHT_WALLET_SEED=<ADMIN_SEED>" >> .env
+echo "RELAYER_WALLET_SEED=<RELAYER_SEED>" >> .env
 
 npm run get-address
 ```
@@ -108,16 +108,24 @@ Next steps:
   3. Run: npm run deploy
 ```
 
-To get the **relayer** address, temporarily swap the seed and run again:
+To get the **relayer** address, run the relayer funding helper:
 
 ```bash
-MIDNIGHT_WALLET_SEED=<RELAYER_SEED> npm run get-address
-# copy the mn_addr_preview1… address printed, then restore the admin seed in .env
+npm run relayer:fund
+```
+
+On the first run it prints the relayer SYSTEM wallet address and asks you to
+fund it. If NIGHT is already visible, it registers those NIGHT UTXOs for DUST
+generation. If DUST is already available, it exits successfully.
+If the public preview network is slow to sync, rerun it or raise the timeout:
+
+```bash
+RELAYER_FUND_SYNC_TIMEOUT_MS=300000 npm run relayer:fund
 ```
 
 ---
 
-## Step 3 — Fund both wallets from the Midnight faucet
+## Step 3 — Fund both wallets and register DUST
 
 1. Open https://faucet.preview.midnight.network/
 2. Paste the **admin address** (`mn_addr_preview1…`) and request NIGHT.
@@ -125,10 +133,24 @@ MIDNIGHT_WALLET_SEED=<RELAYER_SEED> npm run get-address
 
 Wait ~2 minutes for the transactions to confirm before continuing.
 
-> **DUST generation happens automatically during deploy.** `npm run deploy`
-> detects if DUST is missing and registers your NIGHT UTXOs for DUST generation
-> before deploying the contract. No extra step needed — just make sure the
-> wallet is funded with NIGHT first.
+Register DUST for the relayer:
+
+```bash
+npm run relayer:fund
+```
+
+Expected outcomes:
+
+| Output | Meaning |
+|---|---|
+| `No NIGHT detected yet` | Faucet tx is not visible yet; wait and rerun |
+| `Registering NIGHT UTXOs for DUST generation` | The helper found NIGHT and is submitting the DUST registration tx |
+| `Relayer wallet is ready` | The relayer has DUST and can pay attestation fees |
+
+> **Admin DUST generation happens during deploy.** `npm run deploy` detects if
+> the admin wallet has NIGHT but no DUST and registers its UTXOs before deploying
+> the contract. The relayer is a separate fee-payer, so use
+> `npm run relayer:fund` for it.
 
 ---
 
@@ -203,6 +225,8 @@ RELAYER_WALLET_SEED=<RELAYER_SEED from Step 1>
 
 > `OPERATOR_ZSWAP_SEED` holds no funds and is safe to store on the collector host.
 > `RELAYER_WALLET_SEED` controls real NIGHT — restrict with `chmod 600 .env`.
+> For a single-machine demo, `RELAYER_WALLET_SEED` may equal
+> `MIDNIGHT_WALLET_SEED`, but production should separate admin and relayer keys.
 
 ---
 
@@ -214,7 +238,15 @@ Open three terminals (or use `pm2` — see the end of this doc).
 
 ```bash
 cd zkMonitor
+npm run relayer:fund   # rerun if DUST was exhausted
 npm run relayer
+```
+
+The relayer waits for wallet sync before listening on `7300` so it can see
+fresh NIGHT/DUST state. Default sync timeout is 5 minutes. If Preview is slow:
+
+```bash
+RELAYER_WALLET_SYNC_TIMEOUT_MS=600000 npm run relayer
 ```
 
 ```
@@ -316,6 +348,20 @@ ONCHAIN_POLL_INTERVAL_MS=15000
 Default rate limit is 6 requests/minute per source. Increase if needed:
 ```env
 RELAYER_MAX_REQUESTS_PER_MIN=30
+```
+
+**`npm run relayer:fund` ends with `Wallet sync timed out`**
+The helper already printed the relayer address. Fund that address, wait for the
+preview network/indexer to catch up, then rerun. If preview is slow, increase:
+```bash
+RELAYER_FUND_SYNC_TIMEOUT_MS=300000 npm run relayer:fund
+```
+
+**`npm run relayer` ends with `Relayer wallet sync timed out`**
+The wallet has not synced through the public preview RPC/indexer before the
+runtime safety timeout. Rerun, or increase the timeout:
+```bash
+RELAYER_WALLET_SYNC_TIMEOUT_MS=600000 npm run relayer
 ```
 
 ---

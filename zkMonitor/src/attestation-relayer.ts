@@ -93,7 +93,11 @@ hydrateEnv();
 // Config
 // ---------------------------------------------------------------------------
 
-const RELAYER_WALLET_SEED = process.env.RELAYER_WALLET_SEED?.trim() || '';
+const RELAYER_WALLET_SEED = (
+  process.env.ZKSPLUNK_RELAYER_USE_DEPLOYER_WALLET === 'true'
+    ? process.env.MIDNIGHT_WALLET_SEED
+    : process.env.RELAYER_WALLET_SEED
+)?.trim().replace(/[^0-9a-fA-F]/g, '') || '';
 const RELAYER_PORT = parseInt(process.env.RELAYER_PORT ?? '7300', 10);
 const MIDNIGHT_INDEXER_URL = process.env.MIDNIGHT_INDEXER_URL ?? 'http://localhost:8088/api/v4/graphql';
 const MIDNIGHT_NODE_URL = (process.env.MIDNIGHT_NODE_URL ?? 'ws://localhost:9944')
@@ -103,6 +107,7 @@ const MIDNIGHT_NODE_URL = (process.env.MIDNIGHT_NODE_URL ?? 'ws://localhost:9944
 const MIDNIGHT_NETWORK_ID = process.env.MIDNIGHT_NETWORK_ID ?? 'preview';
 const MIDNIGHT_PROOF_SERVER_URL = process.env.MIDNIGHT_PROOF_SERVER_URL ?? 'http://localhost:6300';
 const MAX_REQUESTS_PER_MIN = parseInt(process.env.RELAYER_MAX_REQUESTS_PER_MIN ?? '6', 10);
+const RELAYER_WALLET_SYNC_TIMEOUT_MS = parseInt(process.env.RELAYER_WALLET_SYNC_TIMEOUT_MS ?? '', 10) || 300_000;
 const ALLOWED_CLASSES_ENV = process.env.RELAYER_ALLOWED_INCIDENT_CLASSES?.trim();
 const ALLOWED_INCIDENT_CLASSES: Set<string> | null = ALLOWED_CLASSES_ENV
   ? new Set(ALLOWED_CLASSES_ENV.split(',').map((s) => s.trim()))
@@ -113,6 +118,24 @@ function deriveWsUrl(httpUrl: string): string {
 }
 
 const INDEXER_WS_URL = deriveWsUrl(MIDNIGHT_INDEXER_URL);
+
+function stringifyForLog(value: unknown): string {
+  return JSON.stringify(value, (_key, v) => (typeof v === 'bigint' ? v.toString() : v));
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Splunk HEC telemetry — the relayer reports its OWN operational health so the
@@ -293,15 +316,23 @@ async function initRelayerWallet(): Promise<RelayerWallet> {
 
   await wallet.start(shieldedSecretKeys, dustSecretKey);
 
-  const facadeState = await firstValueFrom(wallet.state());
+  const facadeState = await withTimeout(
+    wallet.waitForSyncedState(),
+    RELAYER_WALLET_SYNC_TIMEOUT_MS,
+    'Relayer wallet sync',
+  );
   const unshieldedState = facadeState.unshielded;
+  const nightUtxos = facadeState.unshielded.availableCoins.length;
+  const dustCoins = facadeState.dust.availableCoins.length;
 
   // eslint-disable-next-line no-console
   console.log(
     `[relayer] SYSTEM wallet initialized\n` +
       `  network     : ${MIDNIGHT_NETWORK_ID}\n` +
-      `  unshielded  : ${JSON.stringify(unshieldedState)}\n` +
-      `  dust balance: ${JSON.stringify(facadeState.dust)}`,
+      `  NIGHT UTXOs : ${nightUtxos}\n` +
+      `  DUST coins  : ${dustCoins}\n` +
+      `  unshielded  : ${stringifyForLog(unshieldedState)}\n` +
+      `  dust balance: ${stringifyForLog(facadeState.dust)}`,
   );
 
   return { wallet, shieldedSecretKeys, dustSecretKey };
