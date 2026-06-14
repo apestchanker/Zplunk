@@ -63,6 +63,12 @@ ZKSplunk is a working local Splunk Enterprise observability app plus connector/a
 
 ---
 
+## Demo Videos
+
+- **Blockchain attestation demo:** [critical event -> relayer -> Midnight contract -> Splunk](https://drive.google.com/file/d/1yu9T_MIwLzFy-x1NbFm8ctPCVJbMPGHq/view?usp=sharing)
+
+---
+
 ## Architecture
 
 Three implemented demo flows run through ZKSplunk today: a **telemetry ingestion** path (green) that streams Midnight infrastructure health into Splunk, an **AI analyst** path (orange) where operators ask questions inside the Splunk app, and an **on-chain status/attestation** path (purple) that surfaces the deployed Midnight contract, operator count, attestation count, relayer health, and public incident classes in Splunk. The primary analyst surface is the **ZKSplunk AI Toolkit Analyst** tab, which runs SPL over `index=zksplunk` and invokes Splunk AI Toolkit with `| ai prompt="{prompt}" provider=Gemini model=gemini-2.5-flash`. The local `ai-agent` chat remains available for the MCP-backed flow and also prefers Splunk AI Toolkit for phrasing. The dual Splunk MCP + Midnight MCP bridge is shown as the planned extension point, not as a completed production bridge.
