@@ -29,7 +29,7 @@ so the detections are honest.
 
 This document is grounded against three sources of truth:
 
-1. The Midnight ledger spec `Effects` record (verified via `midnight-manual`, see `ZKZAP_SECURITY_PROTOCOL.md`).
+1. The Midnight ledger spec `Effects` record (verified via `midnight-manual`, see `04_ZKZAP_SECURITY_PROTOCOL.md`).
 2. The official docs (`docs.midnight.network`) via the Midnight MCP: transaction lifecycle and indexer GraphQL surface.
 3. The Midnight indexer GraphQL surface (`contractActions`, `queryContractState`, block subscriptions) — what the Macro lens actually pulls.
 
@@ -203,7 +203,7 @@ Scoped to what is physically observable, this is not futile.
 The signals above are documented; the module that turns raw `Effects` into
 `attack_signal` fields for SPL is still to build:
 
-- **`connector/src/attack-signals.ts`** , rolling-window enrichment (see `DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md`).
+- **`connector/src/attack-signals.ts`** , rolling-window enrichment (see `05_DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md`).
 - **Midnight indexer feed** , wire a subscriber to emit block / contract-action / mint / spend events as HEC events for the Macro panel.
 
 These two are the highest-leverage builds before the deadline.
@@ -214,9 +214,9 @@ These two are the highest-leverage builds before the deadline.
 
 | Doc | Role |
 |---|---|
-| `ZKZAP_SECURITY_PROTOCOL.md` | The detect → decide → act security layer + threat taxonomy |
-| `DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md` | Health pulse, attack-signal taxonomy, SPL queries, AI agent wiring |
-| `MIDNIGHT_BASE_LAYER_RESEARCH.md` | Base-layer / dogfood DApp decision for the demo |
+| `04_ZKZAP_SECURITY_PROTOCOL.md` | The detect → decide → act security layer + threat taxonomy |
+| `05_DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md` | Health pulse, attack-signal taxonomy, SPL queries, AI agent wiring |
+| `16_MIDNIGHT_BASE_LAYER_RESEARCH.md` | Base-layer / dogfood DApp decision for the demo |
 
 ---
 

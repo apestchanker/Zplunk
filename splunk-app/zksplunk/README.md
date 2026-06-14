@@ -131,7 +131,7 @@ The demo attestation runtime has three moving pieces:
 Open **zkZap Attestation** for the full pipeline view. Open **Global Map** for
 the compact operator view where the blockchain state appears alongside the
 health KPIs. Full setup is documented in
-`docs/BLOCKCHAIN_PIPELINE_SETUP.md`.
+`docs/09_SETUP_BLOCKCHAIN_PIPELINE.md`.
 
 ## Alert rules
 

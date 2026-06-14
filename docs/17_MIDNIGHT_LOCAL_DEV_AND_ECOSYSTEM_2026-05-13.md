@@ -255,7 +255,7 @@ Stev is brewing a hands-on midnight node validator workshop in Discord (~next fe
 
 ### Other DIDzMonolith Midnight projects
 
-Anywhere a project currently says "deploy to pre-prod" or "fund from faucet" in its README, we should add: *"For local development, use `midnightntwrk/midnight-local-dev` (see `MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`)."*
+Anywhere a project currently says "deploy to pre-prod" or "fund from faucet" in its README, we should add: *"For local development, use `midnightntwrk/midnight-local-dev` (see `17_MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`)."*
 
 Affected: AgenticDID, KYCz, GeoZ, EncryptVault, SilentLedger, SelectConnect, DiscoveryManagement, equineProData, petProData, sharedScience, proofOrBluff, realVote, SentinelDID, SentinelAI, ProMingle, HuddleBridge, DownMan, DIDz-io, SouLink, PopCork, safeHealthData.
 
@@ -271,9 +271,8 @@ For John to consider:
 5. **Submit a 1AM-listed DApp** (BlindOracle is the obvious candidate) via PR to their app registry — 2-3 day review, free distribution
 
 For Penny to execute (already in motion):
-- Update ZKSplunk's `MIDNIGHT_BASE_LAYER_RESEARCH.md` to point at the official tool (this session)
+- Update ZKSplunk's `16_MIDNIGHT_BASE_LAYER_RESEARCH.md` to point at the official tool (this session)
 - Drop a copy of this doc into `EventRevolution/docs/` and `SplitNight_me_app/docs/` (this session)
-- Mention in `PENNYS_NOTES_TO_JOHN.md` for the hackathon
 
 ---
 

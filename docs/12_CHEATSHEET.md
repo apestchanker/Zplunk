@@ -164,14 +164,14 @@ Every submission **must** include:
 | Compact compiler | **compactc 0.31.0** (language 0.23.0, runtime 0.16.0) | Latest stable as of Apr 29, 2026 |
 | Pragma | `pragma language_version >= 0.16 && <= 0.23;` | Range to cover backward + current |
 | Demo DApp | **BlindOracle** (already in DIDzMonolith) | Self-built, no external dep, already wired with Vitals |
-| Local environment | **`midnightntwrk/midnight-local-dev`** (official tool, surfaced May 13, 2026) | Sanctioned, `npm start` one-liner, pre-funded master wallet, auto DUST registration. See `MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`. |
+| Local environment | **`midnightntwrk/midnight-local-dev`** (official tool, surfaced May 13, 2026) | Sanctioned, `npm start` one-liner, pre-funded master wallet, auto DUST registration. See `17_MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`. |
 | Vitals layer | **MidnightVitals** (12 files already in repo) | Telemetry source |
 | Connector | **TypeScript HEC client** (already built) | Batches + exponential retry into Splunk HEC |
 | Splunk side | **Splunk Cloud trial** + HEC token | 60-day free trial |
 | AI agent | **Splunk MCP Server ↔ Midnight (Idris) MCP** bridge | Targets $1K MCP bonus + Grand differentiator |
 | Hosted model | **Cisco Deep Time Series Model** for proof latency forecasting | Targets $1K Hosted Models bonus (stretch) |
 
-See `MIDNIGHT_BASE_LAYER_RESEARCH.md` for the deep dive on why we picked BlindOracle + standalone Docker over 1AM wallet integration or EddaLabs template.
+See `16_MIDNIGHT_BASE_LAYER_RESEARCH.md` for the deep dive on why we picked BlindOracle + standalone Docker over 1AM wallet integration or EddaLabs template.
 
 ---
 
@@ -204,15 +204,14 @@ See `MIDNIGHT_BASE_LAYER_RESEARCH.md` for the deep dive on why we picked BlindOr
 
 ## Internal Links (This Repo)
 
-- `docs/HACKATHON_RULES_AND_DEADLINES.md` — full rules + sprint plan (updated)
-- `docs/CALENDAR.md` — confirmed dates + Penny's reminder schedule
-- `docs/PENNYS_NOTES_TO_JOHN.md` — Penny's recommendations + open questions
-- `docs/MIDNIGHT_BASE_LAYER_RESEARCH.md` — stack deep dive: 1AM vs EddaLabs vs official examples
-- `docs/HACKATHON_STRATEGY.md` — pre-existing strategy doc
-- `docs/DEAR_JUDGES.md` — pre-existing judge-facing pitch
-- `docs/BUILD_OUT_ARCHITECTURE_2026-04-21.md` — pre-existing architecture
-- `docs/DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md` — pre-existing detection patterns
-- `docs/FUTURE_DIRECTIONS.md` — post-hackathon roadmap
+- `docs/13_HACKATHON_RULES_AND_DEADLINES.md` — full rules + sprint plan (updated)
+- `docs/15_CALENDAR.md` — confirmed dates + Penny's reminder schedule
+- `docs/16_MIDNIGHT_BASE_LAYER_RESEARCH.md` — stack deep dive: 1AM vs EddaLabs vs official examples
+- `docs/14_HACKATHON_STRATEGY.md` — pre-existing strategy doc
+- `docs/02_DEAR_JUDGES.md` — pre-existing judge-facing pitch
+- `docs/07_BUILD_OUT_ARCHITECTURE_2026-04-21.md` — pre-existing architecture
+- `docs/05_DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md` — pre-existing detection patterns
+- `docs/11_FUTURE_DIRECTIONS.md` — post-hackathon roadmap
 
 ---
 

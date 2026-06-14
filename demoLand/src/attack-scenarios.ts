@@ -2,7 +2,7 @@
 // ZKSplunk demoLand — zkZap Attack Scenarios
 // =============================================================================
 // Scripted sequences of vital readings that reproduce the threat signals from
-// docs/ZKZAP_SECURITY_PROTOCOL.md §2. Each scenario maps a real-world attack to
+// docs/04_ZKZAP_SECURITY_PROTOCOL.md §2. Each scenario maps a real-world attack to
 // the observable telemetry it would produce on Midnight, so the zkZap detector
 // can trip an incident — all without any live infrastructure or attacker.
 //

@@ -193,6 +193,6 @@ attestation adds `contract` + the zkMonitor tooling.
 ---
 
 *Originally prepared by Cassie (April 21, 2026); updated to match the shipped
-implementation. See [`BLOCKCHAIN_PIPELINE_SETUP.md`](BLOCKCHAIN_PIPELINE_SETUP.md)
+implementation. See [`09_SETUP_BLOCKCHAIN_PIPELINE.md`](09_SETUP_BLOCKCHAIN_PIPELINE.md)
 for the deploy/relayer walkthrough and the repo-root `architecture_diagram.md`
 for the full hackathon diagram.*

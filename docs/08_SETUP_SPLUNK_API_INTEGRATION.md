@@ -4,7 +4,7 @@
 > **Date:** 2026-06-09
 > **Author:** Penny / EnterpriseZK Labs LLC
 > **Sources:** dev.splunk.com tutorials, docs.splunk.com (HEC + REST), and
-> `MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`.
+> `17_MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`.
 
 > **Update — current repo/flow.** This guide documents the original **local**
 > Midnight-stack bring-up (local node/indexer + local Splunk HEC moved to `:8090`
@@ -14,7 +14,7 @@
 > `:8088` collision no longer applies. The `splunk-app/` package referenced below
 > as "unbuilt" is now **built** (dashboards, saved searches, packaged `.spl`), and
 > the Splunk REST surface is exercised by `ai-agent/` and `splunk-app/push-to-splunk.ts`.
-> For the current end-to-end flow see `BLOCKCHAIN_PIPELINE_SETUP.md`. The
+> For the current end-to-end flow see `09_SETUP_BLOCKCHAIN_PIPELINE.md`. The
 > port-collision history and tutorial mapping below are retained as a record.
 
 ---
@@ -128,7 +128,7 @@ our unbuilt `splunk-app/` package:
 | `connector/src/config.ts` | local HEC default `:8088 → :8090`; indexer `8080/api/v1 → 8088/api/v3`; explanatory comments |
 | `.env.example` | indexer URL fixed; HEC port-collision note |
 | `zkMonitor/.env.zkmonitor` | indexer URL fixed; HEC port-collision note |
-| `docs/DEMOLAND_VS_ZKMONITOR.md` | indexer `:8080 → :8088`, node `:9944` |
+| `docs/06_DEMOLAND_VS_ZKMONITOR.md` | indexer `:8080 → :8088`, node `:9944` |
 | `zkMonitor/README.md` | indexer `:8080 → :8088`, node `:9944` |
 
 ---
@@ -142,4 +142,4 @@ our unbuilt `splunk-app/` package:
 ---
 
 *Reference by Penny for ZKSplunk. Verify Splunk endpoints against docs.splunk.com
-and Midnight ports against `MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`.*
+and Midnight ports against `17_MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`.*

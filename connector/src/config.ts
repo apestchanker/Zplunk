@@ -69,7 +69,7 @@ export interface ZKSplunkConfig {
  */
 export const DEFAULT_CONFIG: ZKSplunkConfig = {
   // Local default is :8090, NOT the usual HEC :8088 — midnight-local-dev's indexer
-  // already binds :8088 (hardcoded to match Lace 'undeployed'). See docs/SPLUNK_API_INTEGRATION.md.
+  // already binds :8088 (hardcoded to match Lace 'undeployed'). See docs/08_SETUP_SPLUNK_API_INTEGRATION.md.
   splunkHecUrl: 'https://localhost:8090',
   splunkHecToken: '',
   splunkIndex: 'zksplunk',

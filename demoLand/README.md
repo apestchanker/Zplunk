@@ -10,8 +10,8 @@ sink** (console + `out/events.jsonl`) instead of Splunk Cloud.
 It also replays a set of **zkZap attack scenarios** so you can see the
 observe → detect → commit → attest loop fire without any live infrastructure.
 
-> See `../docs/DEMOLAND_VS_ZKMONITOR.md` for the architecture and
-> `../docs/ZKZAP_SECURITY_PROTOCOL.md` for the threat taxonomy these scenarios map to.
+> See `../docs/06_DEMOLAND_VS_ZKMONITOR.md` for the architecture and
+> `../docs/04_ZKZAP_SECURITY_PROTOCOL.md` for the threat taxonomy these scenarios map to.
 
 ## Run it
 

@@ -4,7 +4,7 @@
 
 ### *Splunking with Midnight*
 
-**The world's first observability bridge between zero-knowledge blockchain infrastructure and Splunk — now with [zkZap](docs/ZKZAP_SECURITY_PROTOCOL.md), a privacy-native security layer.**
+**The world's first observability bridge between zero-knowledge blockchain infrastructure and Splunk — now with [zkZap](docs/04_ZKZAP_SECURITY_PROTOCOL.md), a privacy-native security layer.**
 
 *You can't watch what you can't see. Unless you're us.*
 
@@ -12,7 +12,7 @@
 
 [![Built on Midnight](https://img.shields.io/badge/Built_on-Midnight_Network-6C3FC5?style=for-the-badge)](https://midnight.network)
 [![Splunk](https://img.shields.io/badge/Powered_by-Splunk-000000?style=for-the-badge&logo=splunk&logoColor=white)](https://splunk.com)
-[![zkZap](https://img.shields.io/badge/Security-zkZap-EF4444?style=for-the-badge)](docs/ZKZAP_SECURITY_PROTOCOL.md)
+[![zkZap](https://img.shields.io/badge/Security-zkZap-EF4444?style=for-the-badge)](docs/04_ZKZAP_SECURITY_PROTOCOL.md)
 [![Compact](https://img.shields.io/badge/Compact-v0.23-F59E0B?style=for-the-badge)](https://docs.midnight.network/compact)
 [![License](https://img.shields.io/badge/License-Apache_2.0-3B82F6?style=for-the-badge)](LICENSE)
 
@@ -23,6 +23,8 @@
 </div>
 
 ---
+
+> **📌 About this project.** This repository was built for the **Splunk Agentic Ops Hackathon 2026** (organized by Splunk, sponsored by Cisco) — Observability track. ZKSplunk is the first Splunk observability connector for zero-knowledge blockchain infrastructure, built on the Midnight Network. For a guided tour, watch the **[repo & architecture walkthrough video](https://drive.google.com/file/d/1HK4HWZ_jNJt13JM4A6OnrZxR-VMGaNBf/view?usp=sharing)**. New to the docs? Start at [`docs/`](docs/README.md), which lays out a numbered reading order.
 
 <div align="center">
 
@@ -58,13 +60,14 @@ ZKSplunk is a working local Splunk Enterprise observability app plus connector/a
 | Local AI analyst chat | **Running / implemented** | `ai-agent` queries Splunk via MCP when configured, falls back to REST, and phrases evidence-backed answers through Splunk AI Toolkit `| ai`; external LLMs are fallback-only. |
 | Splunk MCP integration | **Implemented for Splunk evidence** | The local analyst can use Splunk MCP or Splunk REST to gather evidence. |
 | Dual MCP bridge: Splunk MCP + Midnight MCP | **Future / planned** | The cross-platform bridge described below is the target architecture: Splunk evidence plus Midnight MCP contract/docs/tooling context in one investigation loop. |
-| On-chain attestation | **Demo runtime implemented / unaudited** | `contract/src/zksplunk.compact`, `zkMonitor` deploy tooling, the attestation relayer, and the read-only on-chain status reader are wired for the demo pipeline. The contract is not audited, so this is not treated as a production attestation system. Setup: [`docs/BLOCKCHAIN_PIPELINE_SETUP.md`](docs/BLOCKCHAIN_PIPELINE_SETUP.md). |
+| On-chain attestation | **Demo runtime implemented / unaudited** | `contract/src/zksplunk.compact`, `zkMonitor` deploy tooling, the attestation relayer, and the read-only on-chain status reader are wired for the demo pipeline. The contract is not audited, so this is not treated as a production attestation system. Setup: [`docs/09_SETUP_BLOCKCHAIN_PIPELINE.md`](docs/09_SETUP_BLOCKCHAIN_PIPELINE.md). |
 | zkZap automated response / SOAR | **Future / planned** | Detection concepts and alert surfaces exist; automated SOAR/on-chain response remains future work. |
 
 ---
 
 ## Demo Videos
 
+- **Repo & architecture walkthrough:** [what ZKSplunk is and how it's built](https://drive.google.com/file/d/1HK4HWZ_jNJt13JM4A6OnrZxR-VMGaNBf/view?usp=sharing)
 - **Blockchain attestation demo:** [critical event -> relayer -> Midnight contract -> Splunk](https://drive.google.com/file/d/1yu9T_MIwLzFy-x1NbFm8ctPCVJbMPGHq/view?usp=sharing)
 
 ---
@@ -125,7 +128,7 @@ graph TD
 | On-chain runtime | `zkMonitor/src/deploy-attestation.ts`, `zkMonitor/src/attestation-relayer.ts`, `zkMonitor/src/onchain-status-reader.ts` | deploy/register, relay critical-incident proofs, and emit `zksplunk:onchain` status/incidents back into Splunk |
 | Splunk attestation UI | `splunk-app/zksplunk/default/data/ui/views/zksplunk_attestation.xml` | contract deployment state, operators, on-chain attestation count, relayer liveness, public incident classes |
 
-> A simulated, offline twin of the collector lives in `demoLand/` — same `connector`/`vitals` code, mock source and local sink. See [`docs/DEMOLAND_VS_ZKMONITOR.md`](docs/DEMOLAND_VS_ZKMONITOR.md).
+> A simulated, offline twin of the collector lives in `demoLand/` — same `connector`/`vitals` code, mock source and local sink. See [`docs/06_DEMOLAND_VS_ZKMONITOR.md`](docs/06_DEMOLAND_VS_ZKMONITOR.md).
 
 ---
 
@@ -155,7 +158,7 @@ Two lenses over **one** pipeline:
 | Catches | Local brute-force, wallet drain, proof abuse | Systemic floods, mint storms, outages |
 | Privacy | Never reads private state | Built from public data — nobody shares secrets |
 
-Current demo flow: operators can emit **anonymous, unlinkable critical-incident attestations** through the collector → relayer → Midnight contract path. Only the anonymized incident *class*, severity, epoch, payload commitment, and nullifier are public; the operator and node are not published. The read-only on-chain status reader sends `zksplunk:onchain` events back to Splunk so the Overview, Global Map, and zkZap Attestation dashboards can show deployment state, operator count, and attestation count. The contract remains **unaudited** and the Macro aggregation view remains future work. (See [`docs/ZKZAP_SECURITY_PROTOCOL.md`](docs/ZKZAP_SECURITY_PROTOCOL.md) §3.3 and [`docs/BLOCKCHAIN_PIPELINE_SETUP.md`](docs/BLOCKCHAIN_PIPELINE_SETUP.md).)
+Current demo flow: operators can emit **anonymous, unlinkable critical-incident attestations** through the collector → relayer → Midnight contract path. Only the anonymized incident *class*, severity, epoch, payload commitment, and nullifier are public; the operator and node are not published. The read-only on-chain status reader sends `zksplunk:onchain` events back to Splunk so the Overview, Global Map, and zkZap Attestation dashboards can show deployment state, operator count, and attestation count. The contract remains **unaudited** and the Macro aggregation view remains future work. (See [`docs/04_ZKZAP_SECURITY_PROTOCOL.md`](docs/04_ZKZAP_SECURITY_PROTOCOL.md) §3.3 and [`docs/09_SETUP_BLOCKCHAIN_PIPELINE.md`](docs/09_SETUP_BLOCKCHAIN_PIPELINE.md).)
 
 ---
 
@@ -176,7 +179,7 @@ Traditional observability sees HTTP 200s and container uptime. It has **zero** u
 
 ## What We Can Glean from the Public Ledger
 
-Midnight is a privacy chain, so the governing rule is simple: **metadata and volumes are public, contents are private.** That public surface is enough to fight on-chain attacks and outages without ever touching private state. Full reference: [`docs/PUBLIC_LEDGER_OBSERVABILITY.md`](docs/PUBLIC_LEDGER_OBSERVABILITY.md).
+Midnight is a privacy chain, so the governing rule is simple: **metadata and volumes are public, contents are private.** That public surface is enough to fight on-chain attacks and outages without ever touching private state. Full reference: [`docs/03_PUBLIC_LEDGER_OBSERVABILITY.md`](docs/03_PUBLIC_LEDGER_OBSERVABILITY.md).
 
 **Three public layers we read:**
 
@@ -300,7 +303,7 @@ Current loop: **detect** in Splunk → **investigate** via Splunk MCP/REST evide
 
 ## Run It: demoLand / zkMonitor
 
-ZKSplunk follows the DIDzMonolith **demoLand / zkMonitor** convention. Both sides share the same `connector` / `vitals` / `contract` code — only the *source* and *sink* change. Full architecture: [`docs/DEMOLAND_VS_ZKMONITOR.md`](docs/DEMOLAND_VS_ZKMONITOR.md).
+ZKSplunk follows the DIDzMonolith **demoLand / zkMonitor** convention. Both sides share the same `connector` / `vitals` / `contract` code — only the *source* and *sink* change. Full architecture: [`docs/06_DEMOLAND_VS_ZKMONITOR.md`](docs/06_DEMOLAND_VS_ZKMONITOR.md).
 
 ```bash
 # demoLand — simulated, offline, safe to record. Runs the zkZap attack scenarios.
@@ -346,7 +349,7 @@ await forwarder.connect();
 </VitalsProvider>
 ```
 
-Every vital check, log entry, and diagnostic report flows to Splunk automatically. Any Midnight DApp is a candidate integration (see [`docs/CANDIDATE_INTEGRATIONS.md`](docs/CANDIDATE_INTEGRATIONS.md)).
+Every vital check, log entry, and diagnostic report flows to Splunk automatically. Any Midnight DApp is a candidate integration (see [`docs/10_CANDIDATE_INTEGRATIONS.md`](docs/10_CANDIDATE_INTEGRATIONS.md)).
 
 ---
 

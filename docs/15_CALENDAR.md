@@ -51,7 +51,7 @@ John runs on UTC-04:00 (EDT). All hard deadlines are noon his time.
 
 | Day | Date | Task |
 |-----|------|------|
-| **Thu** | May 14 | Stack decision: lock Midnight base layer (see `MIDNIGHT_BASE_LAYER_RESEARCH.md`). Verify Splunk Cloud HEC works end-to-end. |
+| **Thu** | May 14 | Stack decision: lock Midnight base layer (see `16_MIDNIGHT_BASE_LAYER_RESEARCH.md`). Verify Splunk Cloud HEC works end-to-end. |
 | **Fri** | May 15 | Wire BlindOracle-as-demo-DApp into the connector. First event reaches Splunk index. |
 | **Sat** | May 16 | Build first Splunk dashboard. Draft architecture_diagram.png. |
 | **Sun** | May 17 | Open-source repo audit (LICENSE check, README, run instructions). |

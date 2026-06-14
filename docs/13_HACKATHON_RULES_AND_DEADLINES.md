@@ -278,4 +278,4 @@ Things John needs to learn before the build sprint:
 ---
 
 *Last updated: June 3, 2026 (midpoint reminder from Devpost) — by Cassie 💜 & Penny 🎀*  
-*Companion docs: `CALENDAR.md`, `CHEATSHEET.md`, `PENNYS_NOTES_TO_JOHN.md`, `MIDNIGHT_BASE_LAYER_RESEARCH.md`*
+*Companion docs: `15_CALENDAR.md`, `12_CHEATSHEET.md`, `16_MIDNIGHT_BASE_LAYER_RESEARCH.md`*

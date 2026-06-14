@@ -74,7 +74,7 @@ Total integration effort for a well-scoped DApp: 1 to 3 engineer-days for steps 
 
 ## Cross-references
 
-- ZKSplunk hackathon plan: `@/home/js/DIDzMonolith/ZKSplunk_Splunking_w_Midnight/docs/HACKATHON_RULES_AND_DEADLINES.md`
+- ZKSplunk hackathon plan: `@/home/js/DIDzMonolith/ZKSplunk_Splunking_w_Midnight/docs/13_HACKATHON_RULES_AND_DEADLINES.md`
 - MidnightVitals canonical implementation: `@/home/js/DIDzMonolith/MidnightVitals/`
 - SnapBooksAi Midnight plan: `@/home/js/SnapBooksAi_com_app/docs/MIDNIGHT_INTEGRATION.md`
 - SmartCart Midnight plan: `@/home/js/DIDzMonolith/SmartCart/docs/MIDNIGHT_INTEGRATION.md`

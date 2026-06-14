@@ -242,7 +242,7 @@ cd ../zkMonitor && cp .env.zkmonitor .env
 #    Set SPLUNK_HEC_TOKEN; point MIDNIGHT_* at the preview network + a local proof server (:6300)
 npm install && npm run start
 #    Watch events land in Splunk → index="zksplunk" | head 20
-#    (optional on-chain attestation: see docs/BLOCKCHAIN_PIPELINE_SETUP.md)
+#    (optional on-chain attestation: see docs/09_SETUP_BLOCKCHAIN_PIPELINE.md)
 ```
 
 **Full demo video** with voice-over, dashboard walkthrough, and on-chain attestation verification: *embedded in Devpost submission.*
@@ -299,8 +299,8 @@ If you want to dig into the code, these are the files that matter most:
 | `connector/src/splunk-forwarder.ts` | Bridge class wiring MidnightVitals → HEC |
 | `connector/src/field-extractions.ts` | 14 ZK-specific field extractions + 11 saved searches |
 | `vitals/context.tsx` | React Context + `splunkCallbacks` prop |
-| `docs/BUILD_OUT_ARCHITECTURE_2026-04-21.md` | Three-layer architecture deep dive |
-| `docs/HACKATHON_STRATEGY.md` | Our full strategy (living document) |
+| `docs/07_BUILD_OUT_ARCHITECTURE_2026-04-21.md` | Three-layer architecture deep dive |
+| `docs/14_HACKATHON_STRATEGY.md` | Our full strategy (living document) |
 
 ---
 

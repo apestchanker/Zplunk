@@ -9,7 +9,7 @@
 // In zkMonitor this logic is expressed as Splunk SPL saved searches + the AI
 // agent; here it runs locally so the demo needs no Splunk account.
 //
-// See docs/ZKZAP_SECURITY_PROTOCOL.md §2 for the threat taxonomy this maps to.
+// See docs/04_ZKZAP_SECURITY_PROTOCOL.md §2 for the threat taxonomy this maps to.
 // =============================================================================
 
 import type { VitalId, VitalCheckResult, VitalStatus } from '../../vitals/types.ts';

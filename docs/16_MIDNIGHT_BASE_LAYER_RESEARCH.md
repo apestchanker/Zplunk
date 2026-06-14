@@ -50,7 +50,7 @@ This **replaces** my earlier hand-rolled Docker compose recommendation. It is th
 
 **Telemetry richness**: ⭐⭐⭐⭐⭐ — every layer emits the events Vitals expects.
 
-**See**: `MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md` for the full deep dive on this tool, the 1AM Zealy sprint, federation details, and the FNO list.
+**See**: `17_MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md` for the full deep dive on this tool, the 1AM Zealy sprint, federation details, and the FNO list.
 
 ---
 

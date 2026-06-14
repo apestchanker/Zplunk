@@ -115,7 +115,7 @@ can be enabled once the contract is deployed and a wallet is configured.
   — no local chain needed.
 - A Splunk (Cloud or self-hosted) HEC URL + token.
 - (Optional) Deployed `zksplunk.compact` address + a funded system/relayer wallet
-  for real attestation. See `BLOCKCHAIN_PIPELINE_SETUP.md`.
+  for real attestation. See `09_SETUP_BLOCKCHAIN_PIPELINE.md`.
 
 ### Run it
 ```bash
@@ -186,5 +186,5 @@ ZKSplunk_Splunking_w_Midnight/
 
 ---
 
-*Companion docs: `ZKZAP_SECURITY_PROTOCOL.md` (what the attack scenarios detect),
+*Companion docs: `04_ZKZAP_SECURITY_PROTOCOL.md` (what the attack scenarios detect),
 `ai-chat/2026-06-06_zkZap_security_protocol_deep_dive.md` (design conversation).*

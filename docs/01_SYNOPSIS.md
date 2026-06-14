@@ -1,7 +1,7 @@
-# ZKSplunk — Synopsis for Alex P.
+# ZKSplunk — Synopsis
 
-> **Welcome!** This is a one-page onboarding so you can get oriented fast and
-> start helping us connect **Midnight** to **ZKSplunk**.
+> **Welcome!** This is a one-page onboarding so you can get oriented fast on how
+> **Midnight** connects to **ZKSplunk**.
 > Written by Penny (John's AI pair) on 2026-06-09. Questions → ping John.
 
 ---
@@ -33,7 +33,7 @@ So we CAN see: which contract + circuit fired and how often, mint amounts,
 unshielded transfers (address + amount), shielded spend *activity*, block
 cadence, tx success/failure. We CANNOT see: private state, circuit arguments, or
 the parties/amounts of *shielded* transfers. Full detail:
-`docs/PUBLIC_LEDGER_OBSERVABILITY.md`.
+`docs/03_PUBLIC_LEDGER_OBSERVABILITY.md`.
 
 We never claim to monitor private state. That honesty is part of the pitch.
 
@@ -86,17 +86,17 @@ This is the highest-value remaining work. Pick whatever fits your strengths:
 - Point `zkMonitor/.env` at Splunk plus the Midnight preview network endpoints.
 - Run `npm run start` for vitals, `npm run relayer` for critical attestation submission, and `npm run onchain-status` for the read-only contract status feed.
 - Confirm the Global Map KPI strip and zkZap Attestation dashboard populate from `midnight:vitals`, `zksplunk:connector`, `zksplunk:relayer`, and `zksplunk:onchain`.
-- Network note: the node and indexer use Midnight's hosted **preview** network; only the proof server runs locally (`:6300`). See `docs/BLOCKCHAIN_PIPELINE_SETUP.md`.
+- Network note: the node and indexer use Midnight's hosted **preview** network; only the proof server runs locally (`:6300`). See `docs/09_SETUP_BLOCKCHAIN_PIPELINE.md`.
 
 ### B. `connector/src/attack-signals.ts` (the detection brain — not built yet)
 - A rolling-window enrichment that turns raw public `Effects` (failed calls, mint rates, unshielded spends) into `attack_signal` fields for SPL.
-- Spec + threat→signal mapping: `docs/PUBLIC_LEDGER_OBSERVABILITY.md` and `docs/DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md`.
+- Spec + threat→signal mapping: `docs/03_PUBLIC_LEDGER_OBSERVABILITY.md` and `docs/05_DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md`.
 
 ### C. Wire the Midnight indexer feed into HEC events (the "Macro" lens — future)
 - Build a subscriber over the Midnight indexer GraphQL (block / contract-action / mint / spend) that emits HEC events for the ecosystem dashboard. Not built yet.
 
 ### D. `connector/src/splunk-rest-client.ts` (nice-to-have, scriptable setup)
-- Splunk REST (`:8089`): login → create index → create HEC token → run SPL. Endpoint map in `docs/SPLUNK_API_INTEGRATION.md`.
+- Splunk REST (`:8089`): login → create index → create HEC token → run SPL. Endpoint map in `docs/08_SETUP_SPLUNK_API_INTEGRATION.md`.
 
 ---
 
@@ -122,9 +122,9 @@ cd demoLand && npm install && npm run demo:dashboard
 
 # Then read, in order:
 #   README.md
-#   docs/PUBLIC_LEDGER_OBSERVABILITY.md   (what we can see on-chain)
-#   docs/SPLUNK_API_INTEGRATION.md        (ports + endpoints + local bring-up)
-#   docs/ZKZAP_SECURITY_PROTOCOL.md       (the security layer)
+#   docs/03_PUBLIC_LEDGER_OBSERVABILITY.md   (what we can see on-chain)
+#   docs/08_SETUP_SPLUNK_API_INTEGRATION.md        (ports + endpoints + local bring-up)
+#   docs/04_ZKZAP_SECURITY_PROTOCOL.md       (the security layer)
 ```
 
 ---

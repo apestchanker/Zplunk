@@ -355,7 +355,7 @@ This is the **dual-MCP bridge**: Splunk's AI layer talks to both the Splunk MCP
 - [ ] Deploy ZKSplunk connector on a cloud server (or GitHub Actions cron).
 - [ ] Publish DevRel health dashboard at a shareable URL.
 - [ ] Record "real-time attack detection" demo (simulated proof-flood).
-- [ ] Update `DEAR_JUDGES.md` with live dashboard link.
+- [ ] Update `02_DEAR_JUDGES.md` with live dashboard link.
 
 ---
 
@@ -368,5 +368,5 @@ This is the **dual-MCP bridge**: Splunk's AI layer talks to both the Splunk MCP
 | `connector/src/attack-signals.ts` | **[TO BUILD]** Rolling-window attack signal enrichment |
 | `zkMonitor/src/http-vitals-provider.ts` | Live HTTP health checks for vitals |
 | `contract/src/zksplunk.compact` | On-chain anonymous critical-incident attestation |
-| `docs/HACKATHON_STRATEGY.md` | Overall hackathon strategy and sprint plan |
-| `docs/DEAR_JUDGES.md` | Submission pitch document |
+| `docs/14_HACKATHON_STRATEGY.md` | Overall hackathon strategy and sprint plan |
+| `docs/02_DEAR_JUDGES.md` | Submission pitch document |

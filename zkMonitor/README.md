@@ -7,7 +7,7 @@ performs actual HTTP health checks against your Midnight infrastructure, and
 forwards events to a real Splunk HEC endpoint. It is the same connector code
 demoLand uses — only the **source** (live HTTP) and **sink** (real HEC) differ.
 
-> See `../docs/DEMOLAND_VS_ZKMONITOR.md` for the architecture.
+> See `../docs/06_DEMOLAND_VS_ZKMONITOR.md` for the architecture.
 
 ## Prerequisites
 
