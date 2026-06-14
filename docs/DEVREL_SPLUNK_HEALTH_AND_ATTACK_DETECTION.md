@@ -1,8 +1,14 @@
 # ZKSplunk — DevRel Health Monitor & Real-Time Attack Detection
 
-**Status**: Design Specification  
+**Status**: Design Specification — **forward-looking**  
 **Last Updated**: Apr 21, 2026  
 **Audience**: Developers integrating Midnight DApps, Splunk engineers, DevRel team
+
+> **Status note.** The live **health pulse** (proof-server / indexer / wallet /
+> contract vitals → Splunk) is implemented. The **attack-signal enrichment**
+> (`attack-signals.ts`), the **AI-agent alerting**, and the **SOAR** flows below
+> are **planned / future work** — they are not built yet. Treat this as a design
+> spec, not a description of shipped behavior.
 
 ---
 
@@ -54,14 +60,14 @@ wiring needed to make both features real.
 │   ├── field-extractions  (indexed fields for fast SPL queries)           │
 │   └── [NEW] attack-signals.ts  (anomaly enrichment before HEC send)     │
 │                                                                           │
-│   Blockfrost Provider (live chain data: blocks, contracts, DUST)         │
+│   Midnight indexer feed (public chain data) — planned Macro lens         │
 └───────────────────────────┬───────────────────────────────────────────────┘
                             │  HTTPS HEC + batch events
                             ▼
 ┌────────────────────────────────────────────────────────────────────────────┐
 │                          SPLUNK CLOUD / SELF-HOSTED                        │
 │                                                                            │
-│  Index: midnight_vitals                                                    │
+│  Index: zksplunk                                                           │
 │  Sourcetype: midnight:vitals                                               │
 │                                                                            │
 │  ┌─────────────────────┐  ┌──────────────────────────────────────────┐   │
@@ -101,7 +107,7 @@ The `SplunkForwarder` already calls `handleVitalCheck` → `vitalCheckToSplunkEv
 The DevRel dashboard just needs:
 
 1. A Splunk app package with the dashboard XML.
-2. A **read-only access token** scoped to the `midnight_vitals` index.
+2. A **read-only access token** scoped to the `zksplunk` index.
 3. An `<iframe>` or Splunk embedded dashboard link on `docs.midnight.network` or the
    ecosystem landing page.
 
@@ -149,7 +155,7 @@ If the proof server is overwhelmed, the entire network goes dark for end users.
 
 **What it looks like**:
 - On-chain: high rate of transactions rejected (invalid ZK proof submissions)
-- Blockfrost subscription: `contractActions` showing unusual `REJECTED` counts
+- Midnight indexer subscription: `contractActions` showing unusual `REJECTED` counts
 
 **Splunk detection query**:
 ```spl
@@ -169,7 +175,7 @@ consume block space (a form of griefing).
 
 **What it looks like**:
 - Network vital goes `critical` across multiple DApps simultaneously
-- Blockfrost WebSocket subscription drops (reconnect storm)
+- Midnight indexer WebSocket subscription drops (reconnect storm)
 - Block height stops advancing (stale indexer)
 
 **Splunk detection query**:
@@ -189,7 +195,7 @@ a partition or BGP attack may be in progress.
 
 **What it looks like**:
 - DUST balance for many wallets drops to zero in a short window
-- `dustLedgerEvents` subscription (via Blockfrost) shows unusual outflow patterns
+- `dustLedgerEvents` subscription (via the Midnight indexer) shows unusual outflow patterns
 
 **Splunk detection query**:
 ```spl
@@ -275,7 +281,7 @@ The ZKSplunk AI Agent is a Splunk AI Assistant action that:
 3. **Fires alerts** via:
    - Splunk alert action → **Slack webhook** (immediate team notification)
    - Splunk SOAR playbook → **PagerDuty** (if severity is critical)
-   - On-chain: calls `reportIncident()` on `zksplunk.compact` (tamper-evident record)
+   - On-chain: calls `attestCriticalIncident()` on `zksplunk.compact` (tamper-evident record)
 
 ### Alert Levels
 
@@ -283,12 +289,12 @@ The ZKSplunk AI Agent is a Splunk AI Assistant action that:
 |-------------|-----------|--------|
 | 🟡 **Advisory** | Single signal, 1 DApp | Log to Splunk, Slack `#midnight-devrel` channel |
 | 🟠 **Warning** | Signal sustained 10+ min OR affects 2+ DApps | Slack `@here`, SOAR creates ticket |
-| 🔴 **Critical** | Signal sustained 20+ min OR affects 5+ DApps | PagerDuty, on-chain `reportIncident` |
+| 🔴 **Critical** | Signal sustained 20+ min OR affects 5+ DApps | PagerDuty, on-chain `attestCriticalIncident` |
 
 ### Splunk Saved Search (Alert Trigger)
 
 ```spl
-index=midnight_vitals sourcetype="midnight:vitals"
+index=zksplunk sourcetype="midnight:vitals"
 | eval is_attack_signal=if(isnotnull(attack_signal), 1, 0)
 | stats sum(is_attack_signal) as signal_count,
         dc(dapp_name) as affected_dapps,
@@ -310,9 +316,10 @@ tools to:
 
 - Query `getAttestationCount()` — confirm on-chain attestation activity matches
   the off-chain signal (correlation check).
-- Call `reportIncident()` — create an immutable on-chain incident record.
-- Query `getIncidentCount()` — show how many incidents have been recorded over time
-  in the DevRel dashboard (transparency metric).
+- Call `attestCriticalIncident()` — append an anonymous, unlinkable on-chain
+  incident record.
+- Read `attestationCount` / the public `incidentLog` — show how many incidents
+  have been recorded over time in the DevRel dashboard (transparency metric).
 
 This is the **dual-MCP bridge**: Splunk's AI layer talks to both the Splunk MCP
 (for alert management) and the Midnight MCP (for on-chain incident attestation).
@@ -341,7 +348,7 @@ This is the **dual-MCP bridge**: Splunk's AI layer talks to both the Splunk MCP
 - [ ] Configure Splunk AI Assistant action on saved search.
 - [ ] Build Slack webhook alert action.
 - [ ] Build SOAR playbook skeleton (advisory → warning → critical escalation).
-- [ ] Wire Midnight MCP bridge: `reportIncident()` on critical alerts.
+- [ ] Wire Midnight MCP bridge: `attestCriticalIncident()` on critical alerts.
 
 ### Phase 4 — Public Demo (~hackathon deadline)
 
@@ -359,7 +366,7 @@ This is the **dual-MCP bridge**: Splunk's AI layer talks to both the Splunk MCP
 | `connector/src/vitals-adapter.ts` | Transforms VitalCheckResults to HEC events |
 | `connector/src/splunk-forwarder.ts` | Manages HEC batching and forwarding lifecycle |
 | `connector/src/attack-signals.ts` | **[TO BUILD]** Rolling-window attack signal enrichment |
-| `blockfrost-provider/src/chain-vitals-provider.ts` | Live chain data for vitals |
-| `contract/src/zksplunk.compact` | On-chain incident attestation |
+| `zkMonitor/src/http-vitals-provider.ts` | Live HTTP health checks for vitals |
+| `contract/src/zksplunk.compact` | On-chain anonymous critical-incident attestation |
 | `docs/HACKATHON_STRATEGY.md` | Overall hackathon strategy and sprint plan |
 | `docs/DEAR_JUDGES.md` | Submission pitch document |

@@ -162,7 +162,7 @@ export function loadConfigFromEnvironment(): ZKSplunkConfig {
 
     enableAttestation: env.ZKSPLUNK_ATTEST_ENABLED === 'true',
     attestationContractAddress: env.ZKSPLUNK_CONTRACT_ADDRESS || DEFAULT_CONFIG.attestationContractAddress,
-    attestationNetwork: (env.BLOCKFROST_MIDNIGHT_NETWORK as ZKSplunkConfig['attestationNetwork']) || DEFAULT_CONFIG.attestationNetwork,
+    attestationNetwork: (env.ZKSPLUNK_ATTEST_NETWORK as ZKSplunkConfig['attestationNetwork']) || DEFAULT_CONFIG.attestationNetwork,
     attestationSamplingRate: parseFloat(env.ZKSPLUNK_ATTEST_SAMPLING_RATE || '') || DEFAULT_CONFIG.attestationSamplingRate,
     attestOnlyOnStatusChange: env.ZKSPLUNK_ATTEST_ONLY_ON_CHANGE !== 'false',
     attestationMinIntervalMs: parseInt(env.ZKSPLUNK_ATTEST_MIN_INTERVAL_MS || '', 10) || DEFAULT_CONFIG.attestationMinIntervalMs,

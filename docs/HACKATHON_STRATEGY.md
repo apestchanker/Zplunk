@@ -117,13 +117,13 @@ Grand + Observability + MCP Server + Platform/Dev Experience + Feedback ≈ **fu
 ### 1. **Technological Implementation** — *"Does the project demonstrate quality software development?"*
 
 **How we win:**
-- **Three independent, cleanly-separated packages** — `@zksplunk/contract`, `@zksplunk/blockfrost-provider`, `@zksplunk/connector` — each installable alone, each with its own `package.json` and `tsconfig.json`
-- **Production-grade TypeScript** — strict mode, typed GraphQL shapes, exhaustive `never` checks, proper error propagation
+- **Cleanly-separated workspace packages** — `@zksplunk/contract`, `@zksplunk/connector`, `@zksplunk/zkmonitor` (plus `vitals/`, `demoLand/`, `splunk-app/`, `ai-agent/`) — each installable alone, each with its own `package.json` and `tsconfig.json`
+- **Production-grade TypeScript** — strict mode, exhaustive `never` checks, proper error propagation
 - **Production-grade HEC client** — event batching, exponential retry backoff, health checks, send statistics, heartbeat self-monitoring
-- **Provider-agnostic abstraction** — `VitalsProviderInterface` lets us swap mock/Blockfrost/self-hosted without touching UI code
-- **Real smart contract** — Compact contract structurally validated via the official Compact MCP toolchain; 6 circuits, 10 ledger items, 2 enums; follows the Brick Towers / Edda Labs sealed-ledger + `persistentHash`-derived public-key patterns
-- **Resumable streaming** — WebSocket subscriber with auto-reconnect, exponential backoff, and re-subscription of in-flight subscriptions
-- **Open-source escape hatch** — every Blockfrost URL is override-able, so a customer can replace us with their own indexer by changing three env vars
+- **Provider-agnostic abstraction** — `VitalsProviderInterface` lets us swap the mock provider and the live HTTP provider without touching UI code
+- **Real smart contract** — Compact contract compiled with the official tooling (compactc 0.31, language 0.23); 5 exported circuits, 7 ledger items, 2 enums; a Merkle-membership operator registry + nullifier-based anonymous attestation on a sealed ledger with `persistentHash`-derived keys
+- **Live HTTP health checks** — proof server, indexer, and node probes against the Midnight preview network
+- **Open-source escape hatch** — every Midnight endpoint (proof server, indexer, node) is env-configurable, so a customer can point at hosted or self-hosted infra by changing env vars
 
 ### 2. **Design** — *"Is the user experience and design of the project well thought out?"*
 
@@ -147,7 +147,7 @@ Grand + Observability + MCP Server + Platform/Dev Experience + Feedback ≈ **fu
 **How we win:**
 - **A first.** No Splunk connector has ever existed for ZK-proof blockchain infrastructure. Not Ethereum-tier privacy chains. Not STARKs. Not SNARKs. We are the first.
 - **A new observability category.** We define "ZK-aware observability": telemetry that understands proof lifecycles, shielded state semantics, and the privacy boundary of zero-knowledge circuits. Splunk has never seen this data type.
-- **A new pattern: tamper-evident observability.** Every vital check can optionally carry a cryptographic commitment that is anchored on-chain. No other Splunk integration does this. The contract we wrote (`zksplunk.compact`) is itself novel on-chain infrastructure.
+- **A new pattern: tamper-evident, anonymous observability.** Critical incidents can optionally carry a cryptographic commitment anchored on-chain as an anonymous, unlinkable attestation. No other Splunk integration does this. The contract we wrote (`zksplunk.compact`) is itself novel on-chain infrastructure.
 - **A new MCP topology.** Dual-MCP bridges (Splunk MCP ↔ Midnight MCP) create cross-platform AI diagnostics that neither MCP alone can perform. This is an architectural pattern, not just a feature.
 
 ---
@@ -170,14 +170,14 @@ John authored **MidnightVitals** — the exact telemetry source ZKSplunk consume
 ### 4. We Already Understand ZK Operations
 We're not an observability team that learned about ZK for the hackathon. We're a ZK team that has deployed contracts on testnet, debugged proof server OOMs at 3am, and written Compact code that runs in circuits. We know what hurts. We know what matters.
 
-### 5. On-Chain Attestation = Unforgeable Proof of Observation
-Added in the April 21 build sprint: a Compact contract that anchors cryptographic commitments of every telemetry snapshot on-chain. When a judge asks *"how do we know the monitor isn't lying?"* — we show them the block height, the commitment, and the off-chain blob that re-hashes to match. **Zero other submissions will have this.**
+### 5. On-Chain Attestation = Unforgeable, Anonymous Proof of Observation
+A Compact contract that anchors **anonymous, unlinkable** attestations of critical incidents on-chain. When a judge asks *"how do we know the monitor isn't lying — and how do you report without exposing operators?"* — we show them the on-chain record, the `payloadCommitment`, and the off-chain blob that re-hashes to match, with the operator proven via Merkle membership but never identified. **Zero other submissions will have this.**
 
-### 6. Blockfrost Partnership Angle
-We're using Blockfrost's brand-new Midnight Indexer API — arguably the most production-ready Midnight infrastructure available today. Blockfrost is already a trusted Cardano infrastructure provider. This positions ZKSplunk inside a validated, enterprise-grade supply chain.
+### 6. Runs on Midnight's Preview Network — No Vendor Lock-In
+ZKSplunk runs against Midnight's hosted **preview** network (indexer + node) with only the proof server local. Every endpoint is env-configurable, so operators can point at hosted or self-hosted Midnight infra — no third-party data vendor in the trust path.
 
 ### 7. Live Chain Data, Not Mocks
-As of April 21, ZKSplunk has `BlockfrostVitalsProvider` — a real, chain-aware implementation of the vitals interface that queries actual Midnight blocks, contracts, and DUST status via Blockfrost. Most hackathon submissions demo with fake data; we demo on the real chain.
+ZKSplunk ships `HttpVitalsProvider` (`zkMonitor/src/http-vitals-provider.ts`) — a real implementation of the vitals interface that runs live HTTP health checks against the proof server, indexer, and node. Most hackathon submissions demo with fake data; we demo on the real chain. (`demoLand/` provides a deterministic offline twin for safe recording.)
 
 ---
 
@@ -192,19 +192,18 @@ As of April 21, ZKSplunk has `BlockfrostVitalsProvider` — a real, chain-aware 
 - [x] 14 ZK-specific Splunk field extractions
 - [x] 11 pre-built SPL saved searches
 - [x] Environment-based config loader (Node.js + Vite)
-- [x] **Compact contract** — `zksplunk.compact` (NEW Apr 21) — observability attestation, structurally validated
-- [x] **Witness scaffold** — `contract/src/witnesses.ts` (NEW Apr 21)
-- [x] **BlockfrostClient** — GraphQL queries for blocks, contracts, DUST, epoch (NEW Apr 21)
-- [x] **BlockfrostSubscriber** — WebSocket manager with auto-reconnect (NEW Apr 21)
-- [x] **BlockfrostVitalsProvider** — real-chain implementation of VitalsProviderInterface (NEW Apr 21)
-- [x] **Telemetry commitment helpers** — canonical snapshot + SHA-256 commit (NEW Apr 21)
+- [x] **Compact contract** — `zksplunk.compact` — anonymous critical-incident attestation (Merkle registry + nullifiers + public log)
+- [x] **Witnesses** — `contract/src/witnesses.ts` (operator secret key + Merkle path)
+- [x] **Live vitals provider** — `zkMonitor/src/http-vitals-provider.ts` — HTTP health checks vs the Midnight preview network
+- [x] **Deploy / relayer / status tooling** — `deploy-attestation.ts`, `attestation-relayer.ts`, `onchain-status-reader.ts`
+- [x] **Telemetry commitment helpers** — canonical snapshot + SHA-256 commit
 - [x] Build-out architecture doc — `docs/BUILD_OUT_ARCHITECTURE_2026-04-21.md`
 - [x] GitHub repo + DIDzMonolith submodule integration
 
 ### 🟡 In Progress / Next Sprint
 - [ ] `compactc` the Compact contract and commit `managed/zksplunk/` artifacts
 - [ ] `npm install` in all three packages, smoke-test the builds
-- [ ] Connector helper that invokes `attestObservation` from `handleVitalCheck`
+- [ ] Connector helper that invokes `attestCriticalIncident` from `handleVitalCheck`
 - [ ] Deploy `zksplunk.compact` to preprod; record contract address
 - [ ] Splunk Cloud trial account + HEC token acquired and wired up
 - [ ] End-to-end integration test: vitals → commit → attest → HEC → Splunk index
@@ -228,8 +227,8 @@ As of April 21, ZKSplunk has `BlockfrostVitalsProvider` — a real, chain-aware 
 |---|---|---|
 | Week 1 | Apr 7 – Apr 13 | ✅ Done — connector, vitals, HEC client |
 | Week 2 | Apr 14 – Apr 20 | ✅ Done — repo integration, first docs |
-| **Week 3** | **Apr 21 – Apr 27** | ✅ Contract + Blockfrost provider scaffolded. Next: compactc, npm install, first Splunk Cloud trial dashboard. |
-| Week 4 | Apr 28 – May 4 | End-to-end: Blockfrost → VitalsProvider → SplunkForwarder → Splunk Cloud live dashboard |
+| **Week 3** | **Apr 21 – Apr 27** | ✅ Contract + live vitals provider scaffolded. Next: compactc, npm install, first Splunk Cloud trial dashboard. |
+| Week 4 | Apr 28 – May 4 | End-to-end: live vitals → SplunkForwarder → Splunk Cloud live dashboard |
 | Week 5 | May 5 – May 11 | Contract deployment to preprod. Polish dashboards. Draft MCP agent. |
 | **Week 6** | **May 12 – May 13** | ⚠️ **RULES DROP.** Read everything. Adjust plan. |
 
@@ -260,12 +259,11 @@ Sit back. Watch results. Book .conf26 travel. 🎟️
 |---|---|---|---|
 | May 13 rules require unplanned tech | Medium | High | Keep architecture flexible. Three-package split means we can swap any layer. |
 | Splunk Cloud trial has crippling limits | Low | High | Apply for trial in Week 4. Identify limits early. Fallback: use free Splunk Enterprise locally. |
-| Can't get proof server running for live demo | Medium | Medium | Mock provider is built. Can run proof server on ASUS (artpro). Blockfrost provider works without a local proof server. |
+| Can't get proof server running for live demo | Medium | Medium | Mock provider (demoLand) is built for offline demos. Can run the proof server on a dedicated box. |
 | MCP bridge scope too ambitious | Medium | Low | It's a $1K bonus track. Cut if needed, keep for Tier 1 tracks. |
-| 28-day build window too tight | Medium | High | We already built the connector, contract, and Blockfrost provider. We have a huge head start. |
-| Chuck's Haswell CPU can't run Halo 2 proofs | Confirmed | Low | Demo on ASUS. Blockfrost handles chain data; proof gen only for local test. |
+| 28-day build window too tight | Medium | High | We already built the connector, contract, and live vitals provider. We have a huge head start. |
+| Underpowered CPU can't run Halo 2 proofs | Confirmed | Low | Demo on a capable box; the preview network handles chain data, proof gen runs on the local proof server. |
 | Repo was made private — submission might require public | Medium | Medium | We can flip public for submission window. GitHub access is already granted to teammates. |
-| Blockfrost rate-limits us mid-demo | Low | High | Free tier should cover. If not: apply for higher tier, or self-host the indexer (single binary). |
 
 ---
 
@@ -293,15 +291,14 @@ Sit back. Watch results. Book .conf26 travel. 🎟️
 ### Resolved
 | Decision | Resolution | Date |
 |---|---|---|
-| Use Blockfrost vs self-host indexer? | Blockfrost for v0/v1 with `*Override` env vars for self-host escape | Apr 21 |
-| On-chain attestation contract? | YES — Compact contract with monitor registry + attestations + incidents | Apr 21 |
-| Three-package split vs monolith? | Three packages (`contract`, `blockfrost-provider`, `connector`) — each installable alone | Apr 21 |
-| Compact language version range | `>= 0.16 && <= 0.21` (matches Brick Towers / current Testnet_02) | Apr 21 |
+| Chain data source | Midnight hosted **preview** network (indexer + node); proof server local; endpoints env-configurable | updated |
+| On-chain attestation contract? | YES — anonymous, unlinkable critical-incident attestation (Merkle registry + nullifiers + public log) | updated |
+| Workspace split | Separate packages (`contract`, `connector`, `zkmonitor`) + `vitals` / `demoLand` / `splunk-app` / `ai-agent` | updated |
+| Compact language version | `pragma language_version >= 0.23` | updated |
 
 ### Open
 | Question | Owner | Deadline |
 |---|---|---|
-| Blockfrost project ID — does John's existing Cardano key work for Midnight, or need a separate project? | John | Week 4 |
 | Splunk Cloud trial account — which plan? | John | Week 4 |
 | AI agent host — Splunk Hosted Models vs local LLM? | After May 13 | May 14 |
 | GitHub repo public/private during submission window? | John + rules | Jun 13 |
@@ -314,8 +311,8 @@ Sit back. Watch results. Book .conf26 travel. 🎟️
 | Date | Change | Author |
 |---|---|---|
 | Apr 6, 2026 | Initial hackathon rules doc created | Penny |
-| Apr 11, 2026 | Blockfrost Midnight Indexer API deep dive; cross-pollinated to monolith | Cassie |
-| **Apr 21, 2026** | **Major build-out sprint.** On-chain attestation contract written + structurally validated. Blockfrost provider package scaffolded (client, subscriber, vitals provider, commitment helper). `docs/BUILD_OUT_ARCHITECTURE_2026-04-21.md` added. | Cassie |
+| Apr 11, 2026 | Midnight indexer API deep dive; cross-pollinated to monolith | Cassie |
+| **Apr 21, 2026** | **Major build-out sprint.** On-chain attestation contract written + structurally validated; live vitals provider scaffolded (HTTP checks, commitment helper). `docs/BUILD_OUT_ARCHITECTURE_2026-04-21.md` added. | Cassie |
 | Apr 21, 2026 | **This doc** — living hackathon strategy overview published alongside `DEAR_JUDGES.md`. | Cassie |
 
 ---

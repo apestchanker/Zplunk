@@ -212,7 +212,6 @@ See `MIDNIGHT_BASE_LAYER_RESEARCH.md` for the deep dive on why we picked BlindOr
 - `docs/DEAR_JUDGES.md` — pre-existing judge-facing pitch
 - `docs/BUILD_OUT_ARCHITECTURE_2026-04-21.md` — pre-existing architecture
 - `docs/DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md` — pre-existing detection patterns
-- `docs/BLOCKFROST_INGESTION_GUIDE.md` — pre-existing Blockfrost path
 - `docs/FUTURE_DIRECTIONS.md` — post-hackathon roadmap
 
 ---

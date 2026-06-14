@@ -2,8 +2,7 @@
 // ZKSplunk — Telemetry Commitment Helpers (connector-local copy)
 // =============================================================================
 // Canonical, connector-local commitment helpers so the package is
-// self-contained and doesn't reach into sibling packages. (Historically this
-// mirrored a copy in the now-removed blockfrost-provider package.)
+// self-contained and doesn't reach into sibling packages.
 // =============================================================================
 
 

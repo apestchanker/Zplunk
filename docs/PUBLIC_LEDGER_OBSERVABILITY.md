@@ -23,11 +23,15 @@ health. We cannot see private state, circuit arguments, or the parties/amounts o
 shielded transfers. Everything below is scoped to what is **physically observable**,
 so the detections are honest.
 
+> **Status:** the **Me** lens (operator self-monitoring) is implemented and live;
+> the **Macro** ecosystem lens described in this document is **planned / future
+> work** — the public-ledger → HEC enrichment module is not built yet (see §7).
+
 This document is grounded against three sources of truth:
 
 1. The Midnight ledger spec `Effects` record (verified via `midnight-manual`, see `ZKZAP_SECURITY_PROTOCOL.md`).
 2. The official docs (`docs.midnight.network`) via the Midnight MCP: transaction lifecycle and indexer GraphQL surface.
-3. Our own `blockfrost-provider` types, which encode what we actually pull from the indexer.
+3. The Midnight indexer GraphQL surface (`contractActions`, `queryContractState`, block subscriptions) — what the Macro lens actually pulls.
 
 ---
 
@@ -78,8 +82,8 @@ is exactly the brute-force / griefing tell.
 
 Confirmed against the indexer API (`contractActions` / `contract_action` query and
 subscription, `queryContractState` at `blockHeight` / `blockHash`, block
-subscriptions over `graphql-transport-ws`) and encoded in
-`blockfrost-provider/src/types.ts`:
+subscriptions over `graphql-transport-ws`) as surfaced by the Midnight indexer
+GraphQL API:
 
 | Shape | Public fields | Use |
 |---|---|---|
@@ -200,7 +204,7 @@ The signals above are documented; the module that turns raw `Effects` into
 `attack_signal` fields for SPL is still to build:
 
 - **`connector/src/attack-signals.ts`** , rolling-window enrichment (see `DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md`).
-- **`blockfrost-provider`** , wire the subscriber to emit block / contract-action / mint / spend events as HEC events for the Macro panel.
+- **Midnight indexer feed** , wire a subscriber to emit block / contract-action / mint / spend events as HEC events for the Macro panel.
 
 These two are the highest-leverage builds before the deadline.
 
@@ -217,4 +221,4 @@ These two are the highest-leverage builds before the deadline.
 ---
 
 *Reference doc by Penny for ZKSplunk. Grounded against the Midnight ledger spec,
-the official docs via the Midnight MCP, and our `blockfrost-provider` types.*
+the official docs via the Midnight MCP, and the Midnight indexer GraphQL surface.*

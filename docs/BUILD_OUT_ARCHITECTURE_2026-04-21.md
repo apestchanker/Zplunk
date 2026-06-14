@@ -1,285 +1,198 @@
-# ZKSplunk Build-Out Architecture — April 2026
+# ZKSplunk Build-Out Architecture
 
-**Date**: April 21, 2026
-**Author**: Cassie
-**Status**: Active scaffold laid down this session — ready for implementation sprints.
+**Originally drafted**: April 21, 2026 (Cassie)
+**Updated**: reflects the shipped implementation — the live vitals path runs
+against Midnight's hosted **preview** network (the indexer and node are used
+directly; no third-party chain-data vendor), and the contract is the anonymous,
+unlinkable critical-incident attestation design described below.
 
 ---
 
 ## 1. The Core Insight
 
-The original ZKSplunk was "Midnight telemetry → Splunk HEC." That's still the headline
-feature, but it leaves one question unanswered:
+The headline feature is "Midnight telemetry → Splunk HEC." But it leaves one
+question unanswered:
 
 > **Can we trust the telemetry itself?**
 
-If a monitor says "proof server up" but is lying or compromised, Splunk dashboards
-are a fiction. In a privacy-preserving ecosystem, operators care deeply about
-*verifiable* observability.
+If a monitor says "proof server up" but is lying or compromised, Splunk
+dashboards are a fiction. In a privacy-preserving ecosystem, operators care
+about *verifiable* observability — and about reporting incidents **without**
+revealing who or where they are.
 
-The build-out answers this with a **three-layer architecture**:
+ZKSplunk answers this with a **three-layer architecture**:
 
 ```
 ┌────────────────────────────────────────────────────────────────────┐
 │ LAYER 3 — Analytics                                                │
-│   Splunk Cloud / ClickHouse dashboards, AI agents, SOAR alerts     │
-│   (existing — driven by HEC events from Layer 2)                   │
+│   Splunk app: dashboards, saved searches, alerts; AI analyst tabs   │
+│   (driven by HEC events from Layer 2)                              │
 └────────────────────────────────────────────────────────────────────┘
                 ▲
-                │ HEC events (already implemented in connector/)
+                │ HEC events (connector/)
                 │
 ┌────────────────────────────────────────────────────────────────────┐
-│ LAYER 2 — Off-chain telemetry (this session added live chain data) │
-│   • BlockfrostClient — GraphQL queries (blocks, contracts, DUST)   │
-│   • BlockfrostSubscriber — WebSocket subscriptions                 │
-│   • BlockfrostVitalsProvider — MidnightVitals-compatible provider  │
-│   • canonical telemetry snapshots + SHA-256 commitments            │
+│ LAYER 2 — Off-chain telemetry                                      │
+│   • zkMonitor/http-vitals-provider — live HTTP checks vs the        │
+│     Midnight PREVIEW network (proof server, indexer, node, wallet)  │
+│   • connector — vitals-adapter, hec-client, field extractions       │
+│   • telemetry-commitment — canonical snapshots + SHA-256 commitments │
 └────────────────────────────────────────────────────────────────────┘
                 ▲
-                │ telemetry commitments
+                │ critical-incident attestations (commitments)
                 │
 ┌────────────────────────────────────────────────────────────────────┐
-│ LAYER 1 — On-chain attestation (this session added)                │
-│   zksplunk.compact — monitor registry + attestation + incidents    │
-│   Sealed ledger anchors, HistoricMerkleTree-style membership,      │
-│   Counter-indexed audit trail.                                     │
+│ LAYER 1 — On-chain attestation                                     │
+│   zksplunk.compact — anonymous, unlinkable critical-incident anchor │
+│   Merkle-membership operator registry + nullifiers + public log     │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-Every piece of Splunk data is, at the user's option, tied back to an on-chain
-commitment. Auditors can re-hash the off-chain blob and verify the monitor
-actually observed what it claimed, at the block height it claimed.
+Critical incidents are, at the operator's option, anchored on-chain as
+**anonymous** attestations. Auditors can re-hash the off-chain blob and verify
+the `payloadCommitment` matches the on-chain record — without learning which
+operator reported it.
 
 ---
 
-## 2. Folder Layout After This Sprint
+## 2. Folder Layout
 
 ```
 ZKSplunk_Splunking_w_Midnight/
-├── contract/                     NEW — on-chain attestation contract
-│   ├── package.json
+├── contract/                  on-chain attestation contract
 │   └── src/
-│       ├── zksplunk.compact      Compact contract (verified structure)
-│       └── witnesses.ts          Off-chain witness (localSecretKey)
+│       ├── zksplunk.compact   Compact contract
+│       └── witnesses.ts       Off-chain witnesses (localSecretKey, operatorPath)
 │
-├── blockfrost-provider/          NEW — chain data layer
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── src/
-│       ├── index.ts              Public API barrel
-│       ├── types.ts              GraphQL shapes + ws protocol types
-│       ├── urls.ts               Endpoint resolver + auth helpers
-│       ├── blockfrost-client.ts  GraphQL HTTP client
-│       ├── blockfrost-subscriber.ts  WebSocket subscription manager
-│       ├── chain-vitals-provider.ts  Real VitalsProviderInterface impl
-│       └── telemetry-commitment.ts   Canonical snapshots + SHA-256 commit
+├── connector/                 Splunk HEC forwarder (shared)
+│   └── src/  (hec-client, splunk-forwarder, vitals-adapter,
+│              field-extractions, telemetry-commitment, attestation-client)
 │
-├── connector/                    EXISTING — Splunk HEC forwarder
-│   └── src/  (hec-client, splunk-forwarder, vitals-adapter, ...)
+├── vitals/                    MidnightVitals UI module + mock provider (shared)
 │
-├── vitals/                       EXISTING — MidnightVitals UI module
-│   └── (context, components, types, mock-vitals-provider, ...)
+├── zkMonitor/                 live wiring
+│   └── src/  (http-vitals-provider, deploy-attestation, attestation-relayer,
+│              onchain-status-reader, fund-relayer, midnight-attestation-client)
 │
+├── demoLand/                  offline simulated runner + zkZap scenarios
+├── splunk-app/zksplunk/       installable Splunk app (dashboards, searches, .spl)
+├── ai-agent/                  local analyst over Splunk MCP/REST evidence
 └── docs/
-    ├── BLOCKFROST_INGESTION_GUIDE.md  Existing ingestion guide
-    ├── BUILD_OUT_ARCHITECTURE_2026-04-21.md  This doc
-    ├── FUTURE_DIRECTIONS.md
-    └── HACKATHON_RULES_AND_DEADLINES.md
 ```
+
+> The node and indexer use Midnight's hosted **preview** network
+> (`rpc.preview.midnight.network`, `indexer.preview.midnight.network/api/v4/graphql`).
+> Only the **proof server** runs locally (`:6300`). There is no separate
+> chain-data provider package.
 
 ---
 
 ## 3. The Compact Contract — `contract/src/zksplunk.compact`
+
+`pragma language_version >= 0.23;`
 
 ### Ledger state
 
 | Field | Type | Purpose |
 |---|---|---|
 | `networkId` (sealed) | `Bytes<32>` | Which Midnight network this contract binds to. Prevents cross-network replay. |
-| `adminPublicKeyHash` (sealed) | `Bytes<32>` | Immutable admin identity. |
+| `adminPublicKeyHash` (sealed) | `Bytes<32>` | Immutable admin identity (manages the operator set). |
 | `observabilitySchemaVersion` (sealed) | `Field` | Off-chain schema version lock. |
-| `monitors` | `Map<Bytes<32>, Bytes<32>>` | Registered monitors: pkHash → metadata commitment. |
-| `attestationCount` | `Counter` | Total attestations (sequence number). |
-| `attestations` | `Map<Field, Bytes<32>>` | seq → telemetry commitment. |
-| `incidents` | `Map<Bytes<32>, Bytes<32>>` | incidentId → details commitment. |
-| `incidentStatuses` | `Map<Bytes<32>, Field>` | incidentId → IncidentStatus (open/ack/mitigated/resolved). |
-| `incidentSeverities` | `Map<Bytes<32>, Field>` | incidentId → Severity (info/warn/degraded/critical/outage). |
-| `incidentCount` | `Counter` | Total incidents. |
+| `operators` | `HistoricMerkleTree<16, Bytes<32>>` | Registered operators as anonymous commitments; depth 16 ⇒ up to 65,536 operators. |
+| `spentNullifiers` | `Set<Bytes<32>>` | Spent unlinkability nullifiers (anti-replay). |
+| `attestationCount` | `Counter` | Total anonymous critical attestations (also the next log index). |
+| `incidentLog` | `Map<Field, IncidentRecord>` | Public append-only log for the off-chain Macro aggregation surface. |
+
+`IncidentRecord = { incidentClass, severity, epoch, payloadCommitment, nullifier }`.
 
 ### Exported circuits
 
 | Circuit | Who can call | What it does |
 |---|---|---|
-| `registerMonitor(pkHash, metaHash)` | Admin only | Registers a monitor. |
-| `revokeMonitor(pkHash)` | Admin only | Removes a monitor. |
-| `attestObservation(commitment)` | Any registered monitor | Anchors a telemetry commitment on-chain with a sequence number. |
-| `reportIncident(id, severity, commitment)` | Any registered monitor | Opens an incident. |
-| `updateIncidentStatus(id, newStatus)` | Admin only | Transitions incident lifecycle. |
-| `isMonitorRegistered(pkHash)` | Anyone | Read-only helper. |
-| `getAttestationCount()` | Anyone | Read-only helper. |
-| `getIncidentCount()` | Anyone | Read-only helper. |
+| `selfRegisterAsOperator()` | Admin only | Registers the deployer/admin as operator 0 (also seeded in the constructor). |
+| `registerOperator(operatorCommitment)` | Admin only | Inserts an external operator's pre-computed commitment leaf. |
+| `attestCriticalIncident(incidentClass, severity, epoch, scopeTag, payloadCommitment)` | Any registered operator | Proves Merkle set-membership in ZK, spends a one-time scoped nullifier, and appends an anonymized record. |
+| `getAttestationCount()` | Anyone | Read-only count. |
+| `isNullifierSpent(nul)` | Anyone | Read-only spent-nullifier check. |
 
-### Patterns borrowed from our Brick Towers / Edda Labs deep dive
+### Enums
+
+- `Severity { info, warning, degraded, critical, outage }`
+- `IncidentClass { proofServerOutage, authBruteforceBurst, mintAnomaly, blockStall, walletDrain }`
+
+### Patterns
 
 1. **`sealed ledger`** for trust anchors that must never change post-deployment.
-2. **`persistentHash`-derived public keys** — Compact has no builtin `public_key()`.
-   Pattern: `persistentHash([pad(32, "zksplunk:monitor:pk:"), sk])`.
-3. **Explicit `disclose()`** on every witness-derived comparison and ledger write.
-4. **`Counter`** as a cheap, auditable sequence number for attestations/incidents.
-5. **Admin + monitor roles** via comparison against sealed key hashes — no
-   complex ACL tree needed for the v0 contract (can upgrade to HistoricMerkleTree
-   later if we need many admins).
-
-### Structure validation
-
-Run through `midnight-extract-contract-structure`:
-- ✅ 6 circuits (3 exported), 10 ledger items (7 exported), 2 enums
-- ✅ No deprecated `Cell<T>` wrappers
-- ✅ Proper pragma range `>= 0.16 && <= 0.21`
-- ✅ Module-scoped witness declaration
+2. **`persistentHash`-derived keys** — Compact has no builtin `public_key()`.
+   Operator leaf: `persistentHash([pad(32, "zksplunk:op:commit:"), sk])`;
+   nullifier and admin key use distinct domains so they cannot be correlated.
+3. **`HistoricMerkleTree`** so membership proofs minted before later
+   registrations stay valid against historic roots.
+4. **Explicit `disclose()`** on every witness-derived comparison and ledger write.
+5. **One-time scoped nullifier** (`persistentHash(domain, sk, scope)`) for
+   unlinkability + replay protection, where `scope = hash(epoch, scopeTag)`.
 
 ---
 
-## 4. The Blockfrost Provider — `blockfrost-provider/`
+## 4. The Live Vitals Path — `zkMonitor/src/http-vitals-provider.ts`
 
-### What it provides
+Implements the MidnightVitals `VitalsProviderInterface` with real HTTP health
+checks so the existing SplunkForwarder + HEC pipeline run on **live** data:
 
-**Client layer (`BlockfrostClient`)**
+- **`checkProofServer`** — `GET /version` + `/health` against the local proof
+  server; latency classifies healthy / warning / critical.
+- **`checkIndexer` / `checkNode`** — reachability + block freshness vs wall clock
+  against the preview-network indexer (GraphQL) and node RPC.
+- **`checkWallet`** — wallet-boundary health (public metadata only).
+- **`checkContracts`** — per-contract monitorability against the deployed address.
 
-- `getBlock(offset?)` — latest or specific block
-- `getCurrentEpochInfo()` — epoch number, duration, elapsed
-- `getContractState(address)` — contract state bytes + token balances
-- `getDustGenerationStatus(cardanoRewardAddresses)` — DUST status for
-  one or more reward addresses
-- `connectViewingKey(vk)` → `disconnectSession(sid)` — shielded scanning session
-- Plus a raw `query<T>()` escape hatch for arbitrary GraphQL
-
-**Subscription layer (`BlockfrostSubscriber`)**
-
-- graphql-transport-ws handshake (connection_init / connection_ack)
-- Auto-reconnect with exponential backoff (max 30s)
-- Re-subscription of all registered subscriptions on reconnect
-- Per-subscription `onNext` / `onError` / `onComplete` handlers
-
-**Vitals layer (`BlockfrostVitalsProvider`)**
-
-Implements the MidnightVitals `VitalsProviderInterface` so our existing
-UI code, SplunkForwarder, and HEC event pipeline all work with **live chain
-data** instead of the mock provider. Health logic:
-
-- **`checkProofServer`** — HTTP `GET /version`, latency classifies healthy / warning / critical
-- **`checkNetwork`** — fetches latest block; compares `block.timestamp` to
-  wall clock; `< 60s` = healthy, `< 120s` = warning, else critical
-- **`checkWallet`** — if a Cardano reward address is configured, queries
-  `dustGenerationStatus` and reports registration + generation rate
-- **`checkContracts`** — `Promise.allSettled` of `getContractState` for each
-  contract, reports counts of ✓ / missing / error
-
-**Commitment layer (`telemetry-commitment.ts`)**
-
-- `TelemetrySnapshot` — canonical shape (timestamp, network, blockHeight,
-  component, payload)
-- `canonicalStringify()` — sorted-key JSON for deterministic hashing
-- `commitSnapshot()` → 32-byte hex hash, ready to pass to
-  `zksplunk.attestObservation(commitment)`
-- `buildSnapshot()` — convenience constructor
+Commitments (`connector/src/telemetry-commitment.ts`): canonical, sorted-key
+serialization → SHA-256 `payloadCommitment`, ready to feed
+`attestCriticalIncident(...)`.
 
 ---
 
-## 5. End-to-End Flow
+## 5. End-to-End Flow (on-chain attestation)
 
 ```
-       [Monitor agent]                   [Blockfrost]              [Midnight chain]
-            │                                │                          │
-            │ BlockfrostVitalsProvider       │                          │
-            │    .checkProofServer()         │                          │
-            │    .checkNetwork()  ───────────►  GraphQL query           │
-            │    .checkWallet()              │  block / contract / dust │
-            │    .checkContracts() ──────────►                          │
-            │ ◄────────────── vitals data ───┤                          │
-            │                                │                          │
-            │ build canonical snapshot       │                          │
-            │ commit = SHA-256(snapshot)     │                          │
-            │                                │                          │
-            │ ─── attestObservation(commit) ──────────────────────────► │
-            │                                │     zksplunk contract    │
-            │                                │                          │
-            │ SplunkForwarder.handleVitalCheck()                        │
-            │ ─── HEC event { fields, commit, blockHeight } ─►  Splunk  │
-            │                                                           │
-            │                                                           │
-            ▼                                                           ▼
-      Splunk dashboards                                    Blockfrost GraphQL:
-      show the event with                                  `attestations` map
-      on-chain commit ref.                                 contains the same hash.
-      Auditor can re-hash                                  ✅ tamper-evident.
-      the blob to verify.
+   [Collector / zkMonitor]        [Attestation relayer]        [Midnight preview]
+        │                            (funded system wallet)          │
+        │ http-vitals-provider checks                                │
+        │ on CRITICAL alarm:                                         │
+        │   1. prove attestCriticalIncident (ZK, via proof server)   │
+        │   2. serialize proven tx ───► receive over HTTP            │
+        │   3. POST to relayer        pay DUST fee, merge + submit ─► incidentLog
+        │ (operator key is UNFUNDED, identity hidden)                │
+        │                                                            │
+        │ SplunkForwarder.handleVitalCheck() ─── HEC event ─► Splunk │
+        │ onchain-status-reader polls chain ─── zksplunk:onchain ──► Splunk
+        ▼
+  Splunk dashboards show deployment state, operator count,
+  attestation count, and anonymized incident classes.
 ```
 
----
-
-## 6. Should We Use Blockfrost? — Decision
-
-### Short answer: **Yes, for v0–v1.**
-
-### Pros
-- **Zero infrastructure** — no Midnight node, no indexer to maintain
-- **Production-ready GraphQL + WebSocket** — both are what we need, in one place
-- **Three networks** from the same API key
-- **Node RPC included** — compatible with midnight.js SDK out of the box
-- **Free tier** likely sufficient for hackathon + demo scale
-
-### Cons / trade-offs
-- **Shielded tx scanning sends viewing keys to Blockfrost** — fine for demos,
-  a red flag for enterprise deployments
-- **Dependency on a third-party service** — if Blockfrost goes down, ZKSplunk
-  is blind (but the whole point of ZKSplunk is observability, so we'd detect
-  that instantly and failover)
-
-### Mitigation
-The `BlockfrostConfig` type supports `indexerUrlOverride`, `indexerWsUrlOverride`,
-and `nodeRpcUrlOverride`. A self-hosted Midnight indexer that implements the
-same GraphQL schema is a drop-in replacement — we just change the URLs. That
-means "use Blockfrost now, migrate to self-hosted later" is a one-line config
-change, not a rewrite.
+The operator proves membership and emits a class-tagged distress signal while
+disclosing nothing that identifies or links them — "awareness without
+surveillance."
 
 ---
 
-## 7. What's Still Needed
-
-### Contract / ledger side
-- [ ] `compactc` the contract and commit `managed/zksplunk/` artifacts
-- [ ] Write `midnight-rwa-simulator.ts`-style test harness for local circuit tests
-- [ ] Write DApp provider setup (wallet + midnight.js) that loads `zksplunk` contract
-- [ ] Deploy to preprod and record the contract address
-
-### Integration side
-- [ ] `npm install` in `blockfrost-provider/` (resolves `ws` / `@types/node` lints)
-- [ ] `connector/` helper: wrap `handleVitalCheck` so it also calls
-      `attestObservation` via midnight.js when enabled
-- [ ] End-to-end demo script: spin up MidnightVitals with Blockfrost provider,
-      attest each vital check on-chain, forward to Splunk, render the
-      "commitment column" in the dashboard
-
-### Docs
-- [ ] Update `README.md` with the new three-layer architecture diagram
-      (done conceptually in this doc, next step: edit README)
-- [ ] Shared "observability attestation" blog post for the hackathon pitch
-
----
-
-## 8. Contract vs. connector split — why three packages
+## 6. Package split — why separate packages
 
 | Package | Role |
 |---|---|
 | `@zksplunk/contract` | The Compact contract + witnesses; deployed once per network |
-| `@zksplunk/blockfrost-provider` | Runtime chain reader + vitals provider (browser + node safe) |
-| `@zksplunk/connector` | Splunk HEC ingest + MidnightVitals bridge (already existed) |
+| `@zksplunk/connector` | Splunk HEC ingest + MidnightVitals bridge + commitment/attestation helpers |
+| `@zksplunk/zkmonitor` | Live wiring: HTTP vitals, deploy/register, relayer, on-chain status reader |
 
-All three are installable independently. A consumer who only wants "Splunk for
-Midnight with Blockfrost backing" needs just `blockfrost-provider` + `connector`.
-A consumer who also wants on-chain attestations adds `contract`.
+`vitals/` (UI + mock provider), `demoLand/` (offline runner), `splunk-app/`
+(dashboards), and `ai-agent/` (analyst) round out the workspace. A consumer who
+only wants "Splunk for Midnight" needs `connector` + `vitals`; on-chain
+attestation adds `contract` + the zkMonitor tooling.
 
 ---
 
-*Prepared by Cassie — April 21, 2026*
+*Originally prepared by Cassie (April 21, 2026); updated to match the shipped
+implementation. See [`BLOCKCHAIN_PIPELINE_SETUP.md`](BLOCKCHAIN_PIPELINE_SETUP.md)
+for the deploy/relayer walkthrough and the repo-root `architecture_diagram.md`
+for the full hackathon diagram.*

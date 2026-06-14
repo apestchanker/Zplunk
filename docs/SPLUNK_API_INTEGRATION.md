@@ -6,6 +6,17 @@
 > **Sources:** dev.splunk.com tutorials, docs.splunk.com (HEC + REST), and
 > `MIDNIGHT_LOCAL_DEV_AND_ECOSYSTEM_2026-05-13.md`.
 
+> **Update — current repo/flow.** This guide documents the original **local**
+> Midnight-stack bring-up (local node/indexer + local Splunk HEC moved to `:8090`
+> to dodge the indexer collision). The live system has since moved to Midnight's
+> **hosted preview network** — indexer `…/api/v4/graphql`, node
+> `rpc.preview.midnight.network` — with only the **proof server** local, so the
+> `:8088` collision no longer applies. The `splunk-app/` package referenced below
+> as "unbuilt" is now **built** (dashboards, saved searches, packaged `.spl`), and
+> the Splunk REST surface is exercised by `ai-agent/` and `splunk-app/push-to-splunk.ts`.
+> For the current end-to-end flow see `BLOCKCHAIN_PIPELINE_SETUP.md`. The
+> port-collision history and tutorial mapping below are retained as a record.
+
 ---
 
 ## 0. TL;DR
@@ -92,7 +103,7 @@ our unbuilt `splunk-app/` package:
 |---|---|---|
 | Module 1 — Get started | app structure, create index, sample events, saved searches, permissions, nav | scaffold `splunk-app/`, install the 11 SPL saved searches |
 | Module 2 — Setup page | securely store a secret in `app.conf` | store HEC token / Midnight endpoint at install time |
-| Module 3 — External lookup | Python script enriching SPL results from an external source | call the Midnight indexer / Blockfrost from inside SPL |
+| Module 3 — External lookup | Python script enriching SPL results from an external source | call the Midnight indexer from inside SPL |
 | Module 4 — Validate & package | `app.conf` validation, packaging, App Inspect | the checklist for the **Best Use of Splunk Developer Tools** bonus |
 | Standalone — Custom view | third-party visualization inside Splunk | optional richer zkZap panels |
 

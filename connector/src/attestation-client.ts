@@ -118,7 +118,7 @@ export interface AttestationClient {
   attestCriticalIncident(input: CriticalIncident): Promise<AttestationResult>;
 
   /**
-   * DEPRECATED — pointed at the removed attestObservation circuit.
+   * DEPRECATED — legacy single-commitment helper from the pre-anonymous design.
    * Kept for back-compat only; implementations return wasSubmitted=false
    * with skipReason='disabled'. Do not call this from new code.
    *
@@ -216,7 +216,7 @@ export class MockAttestationClient implements AttestationClient {
   }
 
   /**
-   * @deprecated The old attestObservation circuit has been removed.
+   * @deprecated Legacy helper from the pre-anonymous design.
    * Routes to attestCriticalIncident with dummy class/severity for back-compat
    * in any existing test harnesses that still call attest(). All production
    * code should call attestCriticalIncident directly.
@@ -302,7 +302,7 @@ export class LoggingAttestationClient implements AttestationClient {
   async attest(commitmentHex: string): Promise<AttestationResult> {
     // eslint-disable-next-line no-console
     console.warn(
-      `${this.logPrefix} attest() is deprecated — the old attestObservation circuit has been removed. ` +
+      `${this.logPrefix} attest() is deprecated — superseded by attestCriticalIncident(). ` +
         `Returning wasSubmitted=false (disabled). Call attestCriticalIncident() instead.`,
     );
     return {

@@ -251,25 +251,29 @@ Midnight is a privacy chain, so the governing rule is simple: **metadata and vol
 
 Status: **demo runtime implemented, not audited yet**. The contract, deploy/register script, relayer, and on-chain status reader define the tamper-evident anchoring path used by the Splunk dashboards, but this is not yet a production-audited attestation system.
 
-Design intent: telemetry lives off-chain (Splunk); only **commitments** and incident state go on-chain. Built on the Brick-Towers sealed-ledger + `persistentHash`-derived public-key patterns (`pragma language_version >= 0.16 && <= 0.23`).
+Design intent: telemetry lives off-chain (Splunk); only **anonymized incident classes** and **commitments** go on-chain — never operator identity. Operators are registered as commitments in a Merkle tree and prove membership in zero knowledge; a one-time scoped nullifier makes critical reports unlinkable and replay-proof. Built on the sealed-ledger + `persistentHash`-derived key patterns (`pragma language_version >= 0.23`).
 
 ```
-enum Severity         { info, warning, degraded, critical, outage }
-enum IncidentStatus   { open, acknowledged, mitigated, resolved }
+enum Severity      { info, warning, degraded, critical, outage }
+enum IncidentClass { proofServerOutage, authBruteforceBurst, mintAnomaly, blockStall, walletDrain }
+
+struct IncidentRecord { incidentClass, severity, epoch, payloadCommitment, nullifier }
 
 sealed ledger networkId, adminPublicKeyHash, observabilitySchemaVersion
-ledger monitors, attestationCount, attestations,
-       incidents, incidentStatuses, incidentSeverities, incidentCount
+ledger operators:       HistoricMerkleTree<16, Bytes<32>>   // anonymous operator commitments
+ledger spentNullifiers: Set<Bytes<32>>                      // unlinkability + anti-replay
+ledger attestationCount: Counter
+ledger incidentLog:     Map<Field, IncidentRecord>          // public append-only log
 ```
 
 | Circuit | Role |
 |---------|------|
-| `registerMonitor` / `revokeMonitor` | Admin manages the monitor registry (by derived key hash) |
-| `attestObservation(commitment)` | A monitor anchors a telemetry snapshot commitment + sequence |
-| `reportIncident(id, severity, commitment)` | zkZap opens a tamper-evident incident |
-| `updateIncidentStatus(id, status)` | open → acknowledged → mitigated → resolved |
+| `selfRegisterAsOperator()` | Admin (deployer) registers itself as operator 0 (the constructor also seeds it) |
+| `registerOperator(operatorCommitment)` | Admin inserts an external operator's pre-computed commitment leaf |
+| `attestCriticalIncident(incidentClass, severity, epoch, scopeTag, payloadCommitment)` | A registered operator anonymously anchors a CRITICAL incident: proves Merkle membership in ZK, spends a one-time scoped nullifier, appends an anonymized record |
+| `getAttestationCount()` / `isNullifierSpent(nul)` | Read-only views over the public log and spent-nullifier set |
 
-Off-chain commitments use canonical hashing (`telemetry-commitment.ts`) so an auditor can independently re-hash the Splunk data and verify it matches what was attested at that block height. This verification model still needs audit and end-to-end production validation.
+Witnesses (`witnesses.ts`): `localSecretKey()` and `operatorPath(leaf)` supply the operator secret and Merkle authentication path — both stay on the prover's machine. The `payloadCommitment` lets an auditor independently re-hash the off-chain Splunk detail and verify it matches what was attested. The contract is demo-wired and **not audited yet**.
 
 ---
 
@@ -290,7 +294,7 @@ graph TD
   C --> B
 ```
 
-Current loop: **detect** in Splunk → **investigate** via Splunk MCP/REST evidence → **respond** with operator guidance. Planned bridge: add Midnight MCP + the `mnm` corpus for contract/docs/tooling context, then correlate and respond through alert / SOAR / on-chain `reportIncident`. Neither MCP can do this alone — the *bridge* is the innovation, and it is future work.
+Current loop: **detect** in Splunk → **investigate** via Splunk MCP/REST evidence → **respond** with operator guidance. Planned bridge: add Midnight MCP + the `mnm` corpus for contract/docs/tooling context, then correlate and respond through alert / SOAR / on-chain `attestCriticalIncident`. Neither MCP can do this alone — the *bridge* is the innovation, and it is future work.
 
 ---
 
@@ -368,7 +372,7 @@ Every vital check, log entry, and diagnostic report flows to Splunk automaticall
 This isn't a pitch deck — it's working, type-checked code.
 
 - **`connector/`** — production HEC client (batch + exponential retry + heartbeat), `SplunkForwarder` lifecycle, type-safe `vitals-adapter`, canonical `telemetry-commitment`, `attestation-client`, **14** field extractions + **11** SPL saved searches.
-- **`contract/`** — `zksplunk.compact` (sealed ledger + `persistentHash` keys; lifecycle circuits; `Severity` / `IncidentStatus` enums). The contract is demo-wired but **not audited yet**.
+- **`contract/`** — `zksplunk.compact` (sealed ledger + `persistentHash` keys; Merkle-membership operator registry + nullifier-based anonymous attestation; `Severity` / `IncidentClass` enums). The contract is demo-wired but **not audited yet**.
 - **`vitals/`** — full MidnightVitals module (mock + live provider interface, UI components).
 - **`demoLand/` + `zkMonitor/`** — offline simulated runner with **zkZap attack scenarios** + a tabbed metrics dashboard, and live HTTP→HEC wiring.
 - **`splunk-app/zksplunk/`** — installable Splunk app with global operator map, component detail dashboard, overview dashboard, saved searches, alert configuration, and packaged `.spl`.
@@ -379,7 +383,7 @@ This isn't a pitch deck — it's working, type-checked code.
 
 - **Dual MCP bridge** — combine Splunk MCP evidence with Midnight MCP contract/docs/tooling context in one agent loop.
 - **Audited on-chain attestation** — audit and harden `zksplunk.compact`, then validate live attestation end to end.
-- **zkZap automated response** — turn detections into Splunk SOAR playbooks and optional on-chain `reportIncident` calls.
+- **zkZap automated response** — turn detections into Splunk SOAR playbooks and optional on-chain `attestCriticalIncident` calls.
 - **Macro consortium view** — aggregate anonymous incident classes across operators without exposing node/operator identity.
 
 ---

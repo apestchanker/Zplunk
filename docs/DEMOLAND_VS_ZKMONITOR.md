@@ -14,8 +14,8 @@
 > ZKSplunk follows the **demoLand / zkMonitor** separation pattern used across all
 > DIDzMonolith products (ProofOrBluff, DiscoveryManagement, realVote, …). ZKSplunk
 > is a connector/library rather than a frontend DApp, so the two sides are **thin
-> orchestrators over the shared packages** (`connector/`, `vitals/`, `contract/`,
-> `blockfrost-provider/`) — they do **not** duplicate pipeline logic.
+> orchestrators over the shared packages** (`connector/`, `vitals/`, `contract/`) —
+> they do **not** duplicate pipeline logic.
 
 ---
 
@@ -30,8 +30,8 @@ demoLand / zkMonitor split gives us both:
 |---|----------|----------|
 | **Vitals source** | `MockVitalsProvider` (simulated health checks) | live HTTP checks against proof server / indexer / wallet |
 | **Splunk sink** | local sink → console + `out/events.jsonl` | real Splunk Cloud HEC endpoint |
-| **On-chain attestation** | `MockAttestationClient` (in-memory sequence + fake tx hash) | midnight.js + Lace wallet → `zksplunk.compact` |
-| **Infra required** | none (no Docker, no internet, no Splunk account) | Midnight standalone Docker + Splunk Cloud trial |
+| **On-chain attestation** | `MockAttestationClient` (in-memory sequence + fake tx hash) | midnight.js + wallet-sdk (seed-derived system wallet) → relayer → `zksplunk.compact` |
+| **Infra required** | none (no Docker, no internet, no Splunk account) | local proof server + hosted Midnight preview network + Splunk HEC |
 | **zkZap attack signals** | scripted scenarios (proof flood, mint anomaly, wallet drain, failed-auth brute force) | derived from real telemetry + public chain `Effects` |
 | **Purpose** | demos, dev, CI, safe video recording | production, live demo, credibility shot |
 
@@ -51,17 +51,17 @@ the *source* and *sink* change.
 │                                  │                                  │
 │  🩺 Vitals: MockVitalsProvider   │  🩺 Vitals: live HTTP checks      │
 │  📤 Sink: console + JSONL file   │  📤 Sink: Splunk Cloud HEC       │
-│  ⛓️  Attest: MockAttestation     │  ⛓️  Attest: midnight.js + Lace   │
+│  ⛓️  Attest: MockAttestation     │  ⛓️  Attest: wallet-sdk + relayer │
 │  🎭 Attacks: scripted scenarios  │  🛰️  Attacks: real telemetry      │
 │                                  │                                  │
-│  No Docker / no internet         │  Proof server (Docker) required   │
-│  No Splunk account               │  Splunk Cloud HEC token required  │
-│  Runs offline, deterministic     │  Live network + chain             │
+│  No Docker / no internet         │  Local proof server required      │
+│  No Splunk account               │  Splunk HEC token required        │
+│  Runs offline, deterministic     │  Hosted preview network + chain   │
 │                                  │                                  │
 └──────────────────────────────────┴──────────────────────────────────┘
         │                                      │
         └──────────── shared packages ─────────┘
-        connector/  vitals/  contract/  blockfrost-provider/
+        connector/  vitals/  contract/
    (vitals-adapter · telemetry-commitment · attestation-client · HEC client)
 ```
 
@@ -109,10 +109,13 @@ indexer) and forwards events to a real Splunk HEC endpoint. On-chain attestation
 can be enabled once the contract is deployed and a wallet is configured.
 
 ### Requires
-- Midnight local-dev stack (proof server :6300, node :9944, indexer :8088), or
-  Blockfrost Midnight project credentials.
-- A Splunk Cloud (or self-hosted) HEC URL + token.
-- (Optional) Deployed `zksplunk.compact` address + Lace wallet for real attestation.
+- A local **proof server** (`:6300`) for ZK proof generation. The node and
+  indexer use Midnight's hosted **preview** network
+  (`rpc.preview.midnight.network`, `indexer.preview.midnight.network/api/v4/graphql`)
+  — no local chain needed.
+- A Splunk (Cloud or self-hosted) HEC URL + token.
+- (Optional) Deployed `zksplunk.compact` address + a funded system/relayer wallet
+  for real attestation. See `BLOCKCHAIN_PIPELINE_SETUP.md`.
 
 ### Run it
 ```bash
@@ -131,20 +134,25 @@ ZKSplunk_Splunking_w_Midnight/
 ├── connector/              # SHARED — HEC client, forwarder, adapter, commitments
 ├── vitals/                 # SHARED — provider interface + MockVitalsProvider
 ├── contract/               # SHARED — zksplunk.compact
-├── blockfrost-provider/    # SHARED — live public-chain data
 ├── demoLand/               # ← simulated runner (no infra)
 │   ├── src/
 │   │   ├── index.ts            # orchestrator: baseline + scenarios
 │   │   ├── local-hec-sink.ts   # console + JSONL sink (HEC stand-in)
 │   │   ├── attack-scenarios.ts # zkZap threat scenarios
-│   │   └── zkzap-detector.ts   # sliding-window incident detector
+│   │   ├── zkzap-detector.ts   # sliding-window incident detector
+│   │   └── build-dashboard.ts  # offline tabbed metrics dashboard (out/dashboard.html)
 │   ├── .env.demoland
 │   ├── package.json
 │   └── README.md
 └── zkMonitor/               # ← live wiring
     ├── src/
-    │   ├── index.ts            # orchestrator: real forwarder + polling loop
-    │   └── http-vitals-provider.ts  # real HTTP health checks
+    │   ├── index.ts                  # orchestrator: real forwarder + polling loop
+    │   ├── http-vitals-provider.ts   # real HTTP health checks
+    │   ├── deploy-attestation.ts     # one-shot deploy + operator self-register
+    │   ├── attestation-relayer.ts    # funded system wallet: pays DUST, submits tx
+    │   ├── onchain-status-reader.ts  # polls chain → zksplunk:onchain events
+    │   ├── midnight-attestation-client.ts  # collector-side ZK proof client
+    │   └── fund-relayer.ts           # relayer NIGHT→DUST registration helper
     ├── .env.zkmonitor
     ├── package.json
     └── README.md
@@ -156,11 +164,11 @@ ZKSplunk_Splunking_w_Midnight/
 
 | Variable | demoLand | zkMonitor |
 |----------|----------|----------|
-| `ZKSPLUNK_MODE` | `demoland` | `zkmonitor` |
+| `ZKSPLUNK_ENVIRONMENT` | `demoland` | `preview` |
 | `SPLUNK_HEC_URL` / `SPLUNK_HEC_TOKEN` | unused | **required** |
-| `MIDNIGHT_PROOF_SERVER_URL` | unused | required |
-| `MIDNIGHT_INDEXER_URL` | unused | required |
-| `ZKSPLUNK_ATTEST_ENABLED` | `false` (mock) | `true` to attest on-chain |
+| `MIDNIGHT_PROOF_SERVER_URL` | unused | required (local) |
+| `MIDNIGHT_INDEXER_URL` | unused | required (hosted preview) |
+| Attestation toggle | `ZKSPLUNK_ATTEST_ENABLED=false` (mock client) | `ENABLE_ATTESTATION=true` (live relayer path) |
 
 > Secrets live only in `.env` (git-ignored). `.env.demoland` and `.env.zkmonitor`
 > are committed **templates** with no real tokens.

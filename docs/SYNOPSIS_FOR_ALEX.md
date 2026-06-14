@@ -56,7 +56,7 @@ We never claim to monitor private state. That honesty is part of the pitch.
 
 Three data paths into Splunk:
 1. **Vitals** — live HTTP health checks against proof server / indexer / wallet / contracts.
-2. **Public chain data** — block / contract-action / mint / spend events via the indexer (and Blockfrost for hosted).
+2. **Public chain data** *(planned — the Macro lens)* — block / contract-action / mint / spend events via the Midnight indexer.
 3. **On-chain attestation status** — `zksplunk:onchain` events from the read-only status reader, plus `zksplunk:relayer` events from the funded relayer.
 
 ---
@@ -70,8 +70,7 @@ Three data paths into Splunk:
 | `connector/src/vitals-adapter.ts` | ✅ | Transforms vital checks → Splunk HEC events |
 | `connector/src/field-extractions.ts` | ✅ | 14 ZK-specific field extractions + 11 SPL saved searches |
 | `connector/src/attestation-client.ts` + `telemetry-commitment.ts` | ✅ | Anchor off-chain telemetry commitments on-chain |
-| `contract/src/zksplunk.compact` | ✅ | Sealed-ledger Compact contract: monitor registry, attestations, incident lifecycle |
-| `blockfrost-provider/` | ✅ | Public-chain data feed (block/contract-action/mint/spend) over GraphQL + WS |
+| `contract/src/zksplunk.compact` | ✅ | Sealed-ledger Compact contract: Merkle-membership operator registry + nullifier-based anonymous critical-incident attestation |
 | `demoLand/` | ✅ | Offline simulated runner + zkZap attack scenarios + an HTML metrics dashboard |
 | `zkMonitor/` | ✅ demo runtime | Live vitals → real HEC wiring, deploy/register helper, relayer, and read-only on-chain status reader |
 | `splunk-app/zksplunk` | ✅ | Global Map with KPI strip, Overview, MCP Analyst, AI Toolkit Analyst, and zkZap Attestation dashboards |
@@ -87,14 +86,14 @@ This is the highest-value remaining work. Pick whatever fits your strengths:
 - Point `zkMonitor/.env` at Splunk plus the Midnight preview network endpoints.
 - Run `npm run start` for vitals, `npm run relayer` for critical attestation submission, and `npm run onchain-status` for the read-only contract status feed.
 - Confirm the Global Map KPI strip and zkZap Attestation dashboard populate from `midnight:vitals`, `zksplunk:connector`, `zksplunk:relayer`, and `zksplunk:onchain`.
-- Local-dev note: the Midnight indexer and Splunk HEC both default to **:8088**. We moved local Splunk HEC to **:8090** to avoid the clash. See `docs/SPLUNK_API_INTEGRATION.md`.
+- Network note: the node and indexer use Midnight's hosted **preview** network; only the proof server runs locally (`:6300`). See `docs/BLOCKCHAIN_PIPELINE_SETUP.md`.
 
 ### B. `connector/src/attack-signals.ts` (the detection brain — not built yet)
 - A rolling-window enrichment that turns raw public `Effects` (failed calls, mint rates, unshielded spends) into `attack_signal` fields for SPL.
 - Spec + threat→signal mapping: `docs/PUBLIC_LEDGER_OBSERVABILITY.md` and `docs/DEVREL_SPLUNK_HEALTH_AND_ATTACK_DETECTION.md`.
 
-### C. Wire the Blockfrost / indexer feed into HEC events (the "Macro" lens)
-- `blockfrost-provider/` already subscribes to chain data; we need it emitting HEC events for the ecosystem dashboard.
+### C. Wire the Midnight indexer feed into HEC events (the "Macro" lens — future)
+- Build a subscriber over the Midnight indexer GraphQL (block / contract-action / mint / spend) that emits HEC events for the ecosystem dashboard. Not built yet.
 
 ### D. `connector/src/splunk-rest-client.ts` (nice-to-have, scriptable setup)
 - Splunk REST (`:8089`): login → create index → create HEC token → run SPL. Endpoint map in `docs/SPLUNK_API_INTEGRATION.md`.
@@ -105,7 +104,7 @@ This is the highest-value remaining work. Pick whatever fits your strengths:
 
 - **Idris Midnight MCP** (primary), cross-checked against **midnight-expert** and **midnight-manual**.
 - **docs.midnight.network** + the hosted **Compact playground**.
-- Compiler: **compactc 0.31.0** (language 0.23). Pragma uses a range: `pragma language_version >= 0.16 && <= 0.23;`.
+- Compiler: **compactc 0.31.0** (language 0.23). Pragma: `pragma language_version >= 0.23;`.
 
 Don't trust older exploratory code without verifying against the above.
 

@@ -6,7 +6,7 @@
 
 [![Built on Midnight](https://img.shields.io/badge/Built_on-Midnight_Network-6C3FC5?style=for-the-badge)](https://midnight.network)
 [![Powered by Splunk](https://img.shields.io/badge/Powered_by-Splunk-000000?style=for-the-badge&logo=splunk&logoColor=white)](https://splunk.com)
-[![Indexed by Blockfrost](https://img.shields.io/badge/Indexed_by-Blockfrost-0033AD?style=for-the-badge)](https://blockfrost.io)
+[![Midnight Preview](https://img.shields.io/badge/Network-Midnight_Preview-6C3FC5?style=for-the-badge)](https://midnight.network)
 [![MCP Bridge](https://img.shields.io/badge/MCP_Bridge-Splunk_%E2%86%94_Midnight-10B981?style=for-the-badge)]()
 [![License](https://img.shields.io/badge/License-Apache_2.0-F59E0B?style=for-the-badge)](../LICENSE)
 
@@ -47,7 +47,7 @@ With gratitude,
 >
 > **But operators still need to know** if the proof server crashed, if the wallet lost its keys, if the contract stopped responding, if the indexer fell behind. Traditional observability tools understand HTTP 200s and Docker container uptime. They have **zero understanding** of ZK proof lifecycles, shielded state transitions, or privacy-aware smart-contract health checks.
 >
-> **ZKSplunk is the first-ever Splunk connector for zero-knowledge blockchain infrastructure.** Built on Midnight (Cardano's privacy-preserving partner chain), backed by Blockfrost's production indexer, it streams ZK-aware telemetry into Splunk, and — uniquely — anchors a cryptographic commitment of every observation on-chain so auditors can prove the monitor saw what it claimed.
+> **ZKSplunk is the first-ever Splunk connector for zero-knowledge blockchain infrastructure.** Built on Midnight (Cardano's privacy-preserving partner chain) and running against Midnight's preview network, it streams ZK-aware telemetry into Splunk, and — uniquely — anchors anonymous, unlinkable attestations of **critical incidents** on-chain so auditors can prove a registered monitor saw what it claimed, without revealing who.
 >
 > **It's Splunk for an observability domain Splunk has never served. With receipts.**
 
@@ -91,7 +91,7 @@ Until now.
                               │ HEC events with commitment column
 ┌──────────────────────────────────────────────────────────────────┐
 │ LAYER 2 — OFF-CHAIN TELEMETRY                                    │
-│ BlockfrostVitalsProvider · SplunkForwarder · MidnightVitals UI   │
+│ HttpVitalsProvider · SplunkForwarder · MidnightVitals UI         │
 │ canonical snapshots → SHA-256 commitments                        │
 └──────────────────────────────────────────────────────────────────┘
                               ▲
@@ -99,7 +99,7 @@ Until now.
 ┌──────────────────────────────────────────────────────────────────┐
 │ LAYER 1 — ON-CHAIN ATTESTATION                                   │
 │ zksplunk.compact — Compact smart contract on Midnight            │
-│ Monitor registry · attestation log · incident ledger             │
+│ Operator Merkle registry · nullifiers · public incident log      │
 └──────────────────────────────────────────────────────────────────┘
 ```
 
@@ -109,29 +109,29 @@ Until now.
 
 A production Compact smart contract (`contract/src/zksplunk.compact`) that:
 
-- **Registers monitors** via an admin-gated registry
-- **Anchors attestations** — every telemetry snapshot becomes a `Bytes<32>` commitment stored with a monotonic sequence number
-- **Tracks incidents** with full lifecycle (open → acknowledged → mitigated → resolved) and severity (info → outage)
+- **Registers operators anonymously** — each operator is a `persistentHash` commitment inserted into a `HistoricMerkleTree` by an admin-gated circuit; there is no public per-operator identity
+- **Anchors anonymous critical-incident attestations** — an operator proves Merkle set-membership in zero knowledge and records an anonymized `IncidentClass` + `Severity` + `epoch` + a `Bytes<32>` payload commitment, with a one-time scoped **nullifier** for unlinkability and replay protection
+- **Public append-only incident log** (`incidentLog`) + an `attestationCount` counter for the off-chain Macro aggregation surface
 - **Uses sealed ledger** for immutable trust anchors (network ID, admin key hash, schema version)
 - **Derives identities** via `persistentHash` (because Compact deliberately has no builtin `public_key()` — we followed the ecosystem's canonical pattern)
-- **Structurally validated** through the official Compact language tooling: 6 circuits, 10 ledger items, 2 enums, all clean
+- **Compiles** on the official Compact tooling (compactc 0.31, language 0.23): 5 exported circuits, 7 ledger items, 2 enums
 
-This layer makes ZKSplunk's output **unforgeable**. An auditor with the off-chain telemetry blob and the on-chain contract address can:
-1. Re-hash the blob
-2. Look up the sequence number in the `attestations` map
+This layer makes ZKSplunk's critical-incident output **unforgeable and anonymous**. An auditor with the off-chain telemetry blob and the on-chain contract address can:
+1. Re-hash the blob to recompute the `payloadCommitment`
+2. Look up the matching record in the public `incidentLog`
 3. Verify the commitments match
 
 If they match, the monitor is cryptographically proven to have observed that exact data at that exact block height. If they don't match, the evidence is either tampered or fabricated. **This is a capability no existing Splunk connector has.**
 
 ### Layer 2 — Off-Chain Telemetry
 
-A real, chain-aware implementation of MidnightVitals' `VitalsProviderInterface` backed by Blockfrost's Midnight Indexer API:
+A live implementation of MidnightVitals' `VitalsProviderInterface` (`zkMonitor/src/http-vitals-provider.ts`) that runs real HTTP health checks against the Midnight **preview** network:
 
-- **`BlockfrostClient`** — GraphQL HTTP client for blocks, contracts, DUST generation, epoch info, and shielded-session management
-- **`BlockfrostSubscriber`** — WebSocket (graphql-transport-ws) manager with auto-reconnect, exponential backoff, and in-flight re-subscription
-- **`BlockfrostVitalsProvider`** — health logic for proof server (latency thresholds), network (block freshness vs wall clock), wallet (DUST registration + rate), contracts (per-contract state queries with error counting)
-- **Canonical telemetry snapshots** — deterministic JSON serialization + SHA-256 commitment, ready to feed into the on-chain contract
-- **Override-able URLs** — any customer can swap Blockfrost for a self-hosted Midnight indexer with three env vars (`INDEXER_URL_OVERRIDE`, `INDEXER_WS_URL_OVERRIDE`, `NODE_RPC_URL_OVERRIDE`). **No vendor lock-in.**
+- **Proof-server probes** — latency + health/version against the local proof server (`:6300`)
+- **Indexer / node probes** — block freshness vs wall clock and reachability against `indexer.preview.midnight.network` and `rpc.preview.midnight.network`
+- **Wallet / contract probes** — wallet boundary health and per-contract monitorability (public metadata only)
+- **Canonical telemetry commitments** — deterministic serialization + SHA-256 commitment (`connector/src/telemetry-commitment.ts`), ready to feed the on-chain contract
+- **Configurable endpoints** — all infra URLs are env-driven (`MIDNIGHT_PROOF_SERVER_URL`, `MIDNIGHT_INDEXER_URL`, `MIDNIGHT_NODE_URL`), so any operator can point at self-hosted or hosted Midnight infra. **No vendor lock-in.**
 
 ### Layer 3 — Analytics
 
@@ -143,7 +143,7 @@ All of the existing Splunk integration work (which predates this sprint):
 - **14 ZK-specific field extractions** — `proof.server.status`, `proof.generation.duration_s`, `wallet.balance_dust`, `network.sync_lag_s`, and 10 more
 - **11 pre-built SPL saved searches** — proof latency timecharts, wallet connection timelines, contract health summaries, network sync gauges, critical event feeds
 
-Plus what the build sprint is delivering next: the **"commitment column"** dashboard panel — a Splunk UI where every event shows a hex commitment (clickable, copyable) and a "Verify on-chain" link that opens the Blockfrost explorer at the matching attestation sequence number.
+Plus what the build sprint is delivering next: the **"commitment column"** dashboard panel — a Splunk UI where every event shows a hex commitment (clickable, copyable) and a "Verify on-chain" link that opens the Midnight indexer/explorer at the matching attestation record.
 
 ---
 
@@ -213,14 +213,14 @@ We bridge Splunk's MCP server with the Midnight community's MCP server (30+ tool
 
 ### 4. We Own the Full Supply Chain
 - We wrote **MidnightVitals** — the telemetry source
-- We wrote **ZKSplunk** — the connector, contract, and Blockfrost provider
+- We wrote **ZKSplunk** — the connector, contract, and live vitals provider
 - We maintain **30+ Midnight DApps in production** (DIDzMonolith) that are all live demo candidates
 - We're not integrating someone else's black box — we shaped every interface ourselves
 
 ### 5. We Already Have the Infrastructure, Not a Prototype
 - Three cleanly-separated, installable NPM packages
 - A Compact contract that structurally validates
-- A Blockfrost integration that runs against real preprod / mainnet / preview
+- A live integration that runs against the Midnight preview network
 - 11 pre-built SPL saved searches ready to import
 - A polished MidnightVitals UI with a time wheel and natural-language console log
 
@@ -233,18 +233,16 @@ We bridge Splunk's MCP server with the Midnight community's MCP server (30+ tool
 git clone https://github.com/bytewizard42i/ZKSplunk_Splunking_w_Midnight.git
 cd ZKSplunk_Splunking_w_Midnight
 
-# 2. Install
-npm install --workspaces
+# 2. See the whole pipeline run offline — no infra, no accounts:
+cd demoLand && npm install && npm run demo:dashboard
+#    → open out/dashboard.html (proof latency, zkZap incidents, vital health, attestations)
 
-# 3. Configure (copy .env.example and fill in)
-cp .env.example .env
-# Edit: SPLUNK_HEC_URL, SPLUNK_HEC_TOKEN, BLOCKFROST_MIDNIGHT_PROJECT_ID
-
-# 4. Run the connector against live Midnight preprod chain
-npm run dev -w @zksplunk/connector
-
-# 5. Watch events flow into Splunk Cloud within 20 seconds
-#    Open Splunk → `index="zksplunk" | head 20`
+# 3. Or wire the LIVE path:
+cd ../zkMonitor && cp .env.zkmonitor .env
+#    Set SPLUNK_HEC_TOKEN; point MIDNIGHT_* at the preview network + a local proof server (:6300)
+npm install && npm run start
+#    Watch events land in Splunk → index="zksplunk" | head 20
+#    (optional on-chain attestation: see docs/BLOCKCHAIN_PIPELINE_SETUP.md)
 ```
 
 **Full demo video** with voice-over, dashboard walkthrough, and on-chain attestation verification: *embedded in Devpost submission.*
@@ -290,12 +288,13 @@ If you want to dig into the code, these are the files that matter most:
 
 | File | What it is |
 |---|---|
-| `contract/src/zksplunk.compact` | The on-chain attestation contract (Compact, 200 LOC, structurally validated) |
-| `contract/src/witnesses.ts` | Off-chain witness for the contract's secret-key input |
-| `blockfrost-provider/src/blockfrost-client.ts` | GraphQL HTTP client for Blockfrost's Midnight Indexer |
-| `blockfrost-provider/src/blockfrost-subscriber.ts` | WebSocket subscription manager with auto-reconnect |
-| `blockfrost-provider/src/chain-vitals-provider.ts` | `VitalsProviderInterface` implementation with real chain data |
-| `blockfrost-provider/src/telemetry-commitment.ts` | Canonical snapshot + SHA-256 commitment helper |
+| `contract/src/zksplunk.compact` | The on-chain anonymous critical-incident attestation contract (Compact, ~300 LOC) |
+| `contract/src/witnesses.ts` | Off-chain witnesses: operator secret key + Merkle path |
+| `zkMonitor/src/http-vitals-provider.ts` | Live HTTP health checks against the Midnight preview network |
+| `zkMonitor/src/deploy-attestation.ts` | One-shot deploy + operator self-registration |
+| `zkMonitor/src/attestation-relayer.ts` | Funded system wallet: pays DUST, submits attestations |
+| `zkMonitor/src/onchain-status-reader.ts` | Read-only chain poller → `zksplunk:onchain` events |
+| `connector/src/telemetry-commitment.ts` | Canonical snapshot + SHA-256 commitment helper |
 | `connector/src/hec-client.ts` | Production Splunk HEC client with batching and retry |
 | `connector/src/splunk-forwarder.ts` | Bridge class wiring MidnightVitals → HEC |
 | `connector/src/field-extractions.ts` | 14 ZK-specific field extractions + 11 saved searches |

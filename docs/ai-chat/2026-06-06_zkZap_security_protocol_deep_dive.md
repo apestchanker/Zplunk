@@ -8,6 +8,14 @@
 > **Tools used:** `midnight-manual` (`mnm`) retrieval engine, `midnight-expert`
 > plugin marketplace, repo exploration of `ZKSplunk_Splunking_w_Midnight`.
 
+> **Historical transcript.** Kept as a record. It predates two later changes:
+> (1) the live data path moved to Midnight's hosted **preview** network indexer
+> (used directly, no third-party chain-data vendor); and (2) the contract was
+> finalized as the anonymous, unlinkable critical-incident design
+> (`attestCriticalIncident` + Merkle membership + nullifiers), replacing an
+> earlier non-anonymous attestation sketch. Stale names below have been updated to
+> current ones; the `realDeal` folder was later renamed `zkMonitor`.
+
 ---
 
 ## John's opening message
@@ -48,12 +56,12 @@ Included context — exchange with **Jay Albert (Midnight DevRel)**:
   docs already captured its essence.
 
 ### Where the project actually stands (more mature than expected)
-- Real **Compact contract** (`zksplunk.compact`): 6 circuits, sealed-ledger +
+- Real **Compact contract** (`zksplunk.compact`): 5 exported circuits, sealed-ledger +
   `persistentHash`-derived pubkey pattern, idiomatic v0.23.
 - Production-grade **connector**: `SplunkForwarder`, HEC client (batching/retry/
   backoff), `vitals-adapter`, `telemetry-commitment` (canonical hash → on-chain
   anchor), `attestation-client`, 14 ZK field extractions.
-- **MidnightVitals** wired in, Blockfrost provider, Splunk app skeleton.
+- **MidnightVitals** wired in, live HTTP vitals provider, Splunk app skeleton.
 - Full hackathon paper trail (rules parsed, strategy, judging criteria,
   candidate-integration catalog).
 
@@ -83,7 +91,7 @@ Included context — exchange with **Jay Albert (Midnight DevRel)**:
 | Track | Observability | Security (previously avoided) |
 | Data | Health telemetry → Splunk | Same telemetry re-read as threat signals |
 | Output | Dashboards, attestations | Detect → decide → act (block/throttle/quarantine/alert/on-chain incident) |
-| Contract role | `attestObservation` (passive log) | `reportIncident` + status transitions (active) |
+| Contract role | telemetry commitments (passive log) | `attestCriticalIncident` — anonymous critical-incident attestation (active) |
 
 - Key insight: **zkZap is not a separate product — it's the action/security layer
   on top of ZKSplunk's observation layer.** ZKSplunk already collects the exact
@@ -103,7 +111,7 @@ Included context — exchange with **Jay Albert (Midnight DevRel)**:
 
 ### Proposed 9-day path
 1. Days 1–2: lock demo spine — one dogfood DApp (BlindOracle) live, Vitals → HEC → Splunk Cloud.
-2. Days 3–4: the agentic loop — Splunk MCP ↔ Midnight MCP; detect anomaly, use `mnm` for real semantics, narrate diagnosis, trigger **zkZap** response (SOAR + on-chain `reportIncident`).
+2. Days 3–4: the agentic loop — Splunk MCP ↔ Midnight MCP; detect anomaly, use `mnm` for real semantics, narrate diagnosis, trigger **zkZap** response (SOAR + on-chain `attestCriticalIncident`).
 3. Days 5–6: product polish (dashboards, "commitment column", zkZap panel; optional Cisco Deep Time Series).
 4. Day 7: demo video + `architecture_diagram` at repo root.
 5. Days 8–9: buffer — security scrub, flip repo public, MVF feedback ($200), Devpost submission.
@@ -176,7 +184,7 @@ surveillance?"
   drained / brute-forced" lives, with consent, no privacy violation.
 
 **Me feeds Macro via privacy-preserving commitments.** Each individual zkZap
-agent emits an anonymized tag (existing `reportIncident` + on-chain commitment)
+agent emits an anonymized tag (an on-chain `attestCriticalIncident` + commitment)
 saying "anomaly type X happened here" without revealing what. Macro watchers then
 see *"31 DApps reporting elevated failed-auth in the last hour = coordinated
 campaign"* — ecosystem awareness from distress signals, not surveillance. This is
@@ -185,7 +193,7 @@ skepticism.
 
 ### How hard is a POC for both? Not much harder than one.
 Two **lenses over one pipeline** that already exists (Vitals → connector → HEC →
-Splunk → agent → `reportIncident`). Deltas:
+Splunk → agent → `attestCriticalIncident`). Deltas:
 - **Macro POC:** aggregation dashboard + saved searches grouping by `dappName`,
   fed by simulating N DApps. ~**1.5 days**.
 - **Me POC:** a few new **attack-signal detectors** in the adapter (failed-call
@@ -222,13 +230,13 @@ waste of time, as Jay Albert suggested)? **Action chosen: Design doc first.**
 
 **Penny:**
 - **Option B (public-only) is the feasible floor** — solo-buildable in 9 days
-  using the existing `blockfrost-provider`, and it dissolves the "nobody wants to
+  using the Midnight indexer feed, and it dissolves the "nobody wants to
   share" objection because nothing is shared. A clean "network weather station."
 - **Option A (consortium opt-in) is the long-term ceiling** — needs governance +
   real members; not buildable for real in 9 days, only simulatable (dogfood your
   own DApps).
 - **Best design = hybrid/layered:** B as the always-on, opt-in-free floor; A as an
-  optional opt-in enrichment for SLA-grade coverage. `reportIncident` commitments
+  optional opt-in enrichment for SLA-grade coverage. `attestCriticalIncident` commitments
   are the privacy bridge (report *that* an anomaly happened, not *what*).
 - **Futile?** Jay is right about the naive version ("centralized chain-wide SOC
   catching attacks on users' private state" — impossible on a privacy chain, no

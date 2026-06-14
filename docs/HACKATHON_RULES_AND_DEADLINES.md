@@ -144,10 +144,10 @@ When the full rules are published on May 13, we need to immediately:
 - ✅ Vitals-to-Splunk adapter, typed event transformers (`vitals-adapter.ts`)
 - ✅ 14 ZK-specific Splunk field extractions + 11 pre-built SPL saved searches (`field-extractions.ts`)
 - ✅ Environment-based config loader (`config.ts`)
-- ✅ **On-chain attestation Compact contract** (`contract/src/zksplunk.compact`) — monitor registry, telemetry attestations, incident lifecycle. Compiles clean (syntax-only, compiler v0.31.0).
+- ✅ **On-chain attestation Compact contract** (`contract/src/zksplunk.compact`) — Merkle-membership operator registry + nullifier-based anonymous critical-incident attestation. Compiles clean (compiler v0.31.0, language 0.23).
 - ✅ **Attestation client** (`attestation-client.ts`) + **telemetry commitment helpers** (`telemetry-commitment.ts`) — commit off-chain telemetry snapshots on-chain
 - ✅ **Connector test suite** (`connector/src/__tests__/attestation.test.ts`)
-- ✅ **Blockfrost Midnight indexer provider** (`blockfrost-provider/`) — real on-chain data source
+- ✅ **Live vitals provider** (`zkMonitor/src/http-vitals-provider.ts`) — real HTTP health checks against the Midnight preview network
 - ✅ GitHub repo + DIDzMonolith submodule
 
 ### What Needs to Be Built (12 days left)

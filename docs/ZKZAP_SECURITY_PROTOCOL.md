@@ -101,8 +101,9 @@ outside — that is impossible by design, and saying otherwise would be dishones
 ```
                  ┌──────────────────────────────────────────────┐
                  │            ZKSplunk shared pipeline           │
-   MidnightVitals│  Vitals → connector → HEC → Splunk index      │  Blockfrost
-   (per operator)│  → SPL detections → zkZap agent → reportIncident│ (public chain)
+   MidnightVitals│  Vitals → connector → HEC → Splunk index      │  Midnight
+   (per operator)│  → SPL detections → zkZap agent → attestCritical│  indexer
+                 │                                                │ (public chain)
                  └───────────────┬──────────────────┬────────────┘
                                  │                  │
                       ┌──────────▼─────────┐  ┌─────▼───────────────────┐
@@ -118,7 +119,7 @@ outside — that is impossible by design, and saying otherwise would be dishones
 - Runs MidnightVitals on the operator's **own stack** (consented self-monitoring).
 - Sees local signals: failed-auth bursts, abnormal wallet coin-selection,
   proof-server abuse, local state-DB access anomalies.
-- zkZap response: alert + optional SOAR action + **on-chain `reportIncident`**
+- zkZap response: alert + optional SOAR action + **on-chain `attestCriticalIncident`**
   (tamper-evident "a defense fired at this block height").
 - Clear customer (the DApp operator), clear value (uptime + local early-warning),
   sellable.
@@ -129,13 +130,13 @@ Two data strategies were considered:
 
 | Strategy | Feasibility (9 days) | Privacy friction | Verdict |
 |---|---|---|---|
-| **B — Public-only gleaning** (chain `Effects`, tx-failure, mint/spend metadata via Blockfrost/indexer) | **High — solo-buildable** | **None** (reads only public data; nobody shares anything) | **Hackathon floor** |
+| **B — Public-only gleaning** (chain `Effects`, tx-failure, mint/spend metadata via the Midnight indexer) | **High — solo-buildable** | **None** (reads only public data; nobody shares anything) | **Hackathon floor** |
 | **A — Consortium opt-in telemetry** (members share non-proprietary ops telemetry + anonymized incident tags) | Low for real members; simulatable | Requires trust + governance | **Post-hackathon ceiling** |
 
 **Decision:** build **B as the baseline** (always-on, opt-in-free), with **A as an
 optional opt-in enrichment** layer. Privacy-jealous users get value from B without
 sharing; companies wanting SLA-grade coverage opt into A. The privacy-preserving
-bridge for A is the existing `reportIncident` commitment: a member reports *that*
+bridge for A is the `attestCriticalIncident` commitment: a member reports *that*
 an anomaly occurred without revealing *what*.
 
 ### 3.3 How Me feeds Macro — anonymous critical-incident attestation (the novel, privacy-native part)
@@ -163,8 +164,8 @@ another or to a specific operator.
 membership in zero-knowledge: a **Merkle set-membership proof** over the
 registered-operator commitment tree demonstrates *"I am an authorized monitor"*
 without revealing **which** leaf. Registration publishes no per-operator public
-identity. (This replaces the earlier design's public `monitors: Map<keyHash → …>`,
-which only achieved *pseudonymity*.)
+identity. (This replaces an earlier design that used a public per-operator
+key-hash map, which only achieved *pseudonymity*.)
 
 **Unlinkability + anti-replay.** Each critical attestation carries a one-time
 **nullifier** derived from the operator's secret and the incident/epoch. The
@@ -178,15 +179,17 @@ disclosing nothing that identifies or links the operator. That is the "awareness
 without surveillance" guarantee, and the answer to the DevRel "isn't this
 surveillance?" objection.
 
-> **Implementation status.** This is the **target scope**. The current
-> `contract/src/zksplunk.compact` still implements the older *pseudonymous*
-> design (public `monitors` map + disclosed caller key-hash) and must be reworked
-> to: (1) Merkle-membership registration, (2) a nullifier-based unlinkable
-> `attestCriticalIncident(incidentClass, severity, payloadCommitment, nullifier,
-> membershipProof)`, (3) a public append-only incident-class log. The specific
-> Compact primitives (MerkleTree/HistoricMerkleTree ADT, nullifier via
-> `persistentHash`, disclosure rules) **must be verified with `/verify`** before
-> coding — treat the mechanism here as design intent, not validated Compact.
+> **Implementation status (updated).** This design is now **implemented** in
+> `contract/src/zksplunk.compact`: (1) Merkle-membership registration via a
+> `HistoricMerkleTree<16, Bytes<32>>` of operator commitments
+> (`selfRegisterAsOperator` / `registerOperator`); (2) a nullifier-based unlinkable
+> `attestCriticalIncident(incidentClass, severity, epoch, scopeTag, payloadCommitment)`
+> that proves Merkle membership in ZK, derives a scoped nullifier, and asserts it
+> is unspent (`spentNullifiers: Set`); (3) a public append-only incident log
+> (`incidentLog: Map<Field, IncidentRecord>`) plus an `attestationCount` counter.
+> The earlier pseudonymous `monitors` map has been removed. The contract is
+> demo-wired and **not audited** — treat it as a working demo, not a hardened
+> production attestation system.
 
 ---
 
@@ -209,13 +212,15 @@ Scoped to what's physically observable, this is **not** futile.
 | Tier | Action | Mechanism |
 |---|---|---|
 | Notify | Alert operator / watcher | Splunk alert → Slack / PagerDuty |
-| Record (critical only) | Anonymous, unlinkable on-chain attestation — public incident *class* only, no operator/node | `attestCriticalIncident` (Merkle membership + nullifier; *redesign — see §3.3*) |
+| Record (critical only) | Anonymous, unlinkable on-chain attestation — public incident *class* only, no operator/node | `attestCriticalIncident` (Merkle membership + nullifier; see §3.3) |
 | Throttle | Rate-limit offending caller | operator-side middleware hook (Me) |
 | Quarantine | Pause a contract entry point / circuit | operator policy (Me) |
-| Escalate | Status transitions open→ack→mitigated→resolved | `updateIncidentStatus` (existing) |
+| Escalate | On-chain incident-status lifecycle (open→ack→mitigated→resolved) | *planned — not in the current contract* |
 
-The contract already supports the record + escalate tiers
-(`reportIncident`, `updateIncidentStatus`, `Severity`, `IncidentStatus`).
+The current contract supports the **record** tier via `attestCriticalIncident`
+(with the `IncidentClass` and `Severity` enums) plus the read-only
+`getAttestationCount` / `isNullifierSpent` circuits. The escalate tier (an
+on-chain incident-status lifecycle) is **not** in the contract today.
 
 ---
 
@@ -226,8 +231,8 @@ The contract already supports the record + escalate tiers
 | 1 | Splunk Cloud trial + HEC live; pick dogfood DApp (BlindOracle) | Real index receiving events |
 | 1–2 | End-to-end: Vitals → HEC → Splunk index | Live spine (#1 unbuilt item) |
 | 2–3 | **Me** attack-signal detectors in adapter (failed-call counter, mint-rate, wallet-drain heuristic) | New detectors + personal alert |
-| 3–4 | zkZap agent loop: Splunk MCP ↔ Midnight MCP; detect → `mnm` diagnosis → `reportIncident` | Agentic response (the winning piece) |
-| 4–5 | **Macro (B)**: Blockfrost public feed → metadata → SPL aggregation dashboard | Ecosystem payoff panel |
+| 3–4 | zkZap agent loop: Splunk MCP ↔ Midnight MCP; detect → `mnm` diagnosis → `attestCriticalIncident` | Agentic response (the winning piece) |
+| 4–5 | **Macro (B)**: Midnight indexer public feed → metadata → SPL aggregation dashboard | Ecosystem payoff panel |
 | 5–6 | Polish: dashboards, "commitment column", zkZap panel; (stretch) Cisco Deep Time Series forecast | Product look |
 | 7 | Demo video + `architecture_diagram` at repo ROOT | Submission materials |
 | 8–9 | Buffer: security scrub (HEC tokens/.env), flip repo public, MVF feedback ($200), Devpost submit | Submitted |
